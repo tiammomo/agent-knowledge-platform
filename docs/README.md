@@ -1,7 +1,7 @@
 # Agent Knowledge Platform 文档
 
 - 状态：维护中的项目文档入口
-- 最近核对：2026-07-16
+- 最近核对：2026-07-17
 - 适用版本：AKEP v0.1 实验实现
 
 这里是项目文档的统一入口。第一次接触项目，建议先读[系统概览](architecture/system-overview.md)；
@@ -18,7 +18,10 @@
 | 了解项目解决什么问题 | [系统概览](architecture/system-overview.md) | 当前组件、数据边界、核心流程与有意关闭的能力 |
 | 在本地运行和调试 | [本地开发手册](runbooks/local-development.md) | 容器/宿主机启动、开发身份、验证与排障方法 |
 | 通过 HTTP 接入 | [HTTP API 快速参考](reference/http-api.md) | Base URL、请求头、权限、端点分组和可运行示例 |
+| 让外部系统安全接入 | [外部接入设计](architecture/external-integration.md)、[接入运行手册](runbooks/external-system-onboarding.md) | 接入模式、Integration/Connector、canary、轮换与停用 |
 | 通过 SDK 或 MCP 接入 | [TypeScript SDK](../packages/sdk-ts/README.md)、[Python SDK](../packages/sdk-python/README.md)、[MCP Adapter](../apps/mcp-server/README.md) | Agent 侧查询、读取、Usage/Feedback 与候选贡献 |
+| 建立持续知识运营 | [知识持续维护](governance/knowledge-maintenance.md) | Owner、来源水位、复审队列、SLA、冲突和退出 |
+| 设计团队隔离与共享 | [多团队隔离设计](architecture/multi-team-isolation.md) | Tenant/Space、RLS、检索/对象/缓存隔离和 Shared Space |
 | 理解当前完成度 | [实现状态与生产门禁](architecture/implementation-status.md) | 已实现能力、明确关闭项和扩大部署前的门禁 |
 | 理解架构决策 | [技术方案 v0.1](architecture/technical-design-v0.1.md)、[ADR](#架构决策记录) | 架构不变量、目标形态和关键取舍 |
 | 实现或评审协议 | [AKEP v0.1 协议](protocols/akep-v0.1.md)、[机器可读契约](../specs/akep/v0.1/README.md) | 规范语义、OpenAPI、JSON Schema、Profile 和测试向量 |
@@ -32,11 +35,14 @@
 docs/
 ├── README.md
 ├── architecture/
-│   ├── system-overview.md
+│   ├── external-integration.md
 │   ├── implementation-status.md
+│   ├── multi-team-isolation.md
+│   ├── system-overview.md
 │   ├── technical-design-v0.1.md
 │   └── adr/
 ├── governance/
+│   ├── knowledge-maintenance.md
 │   └── trust-and-publication.md
 ├── product/
 │   └── web-console-and-onboarding.md
@@ -45,6 +51,7 @@ docs/
 ├── reference/
 │   └── http-api.md
 └── runbooks/
+    ├── external-system-onboarding.md
     ├── local-development.md
     └── production-pilot.md
 ```
@@ -72,6 +79,7 @@ docs/
 | --- | --- | --- |
 | [ADR-0001](architecture/adr/0001-protocol-first-modular-monolith.md) | Accepted | 协议优先，以模块化单体验证最小闭环 |
 | [ADR-0002](architecture/adr/0002-content-addressed-revisions.md) | Accepted | 内容寻址 Revision 与可变 Channel 分离 |
+| [ADR-0003](architecture/adr/0003-tenant-space-isolation-and-controlled-sharing.md) | Accepted | Tenant 硬隔离、Space 治理和受控共享 |
 
 新增 ADR 应使用递增编号，并至少包含背景、决策、结果、被否决方案与替代/回退条件。
 

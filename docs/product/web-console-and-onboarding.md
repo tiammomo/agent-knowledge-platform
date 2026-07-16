@@ -1,7 +1,7 @@
 # Web Console 与新手引导
 
 - 状态：可运行开发基线
-- 最近核对：2026-07-16
+- 最近核对：2026-07-17
 - 前端：React 19、TypeScript 7、Vite 8、原生 CSS 设计系统
 
 ## 产品目标
@@ -22,6 +22,21 @@ Console 的任务不是把数据库表包装成管理后台，而是让用户看
 | 效果证据 | 解释工作流漏斗、Usage/Feedback 归因、伤害队列和服务 SLO | evidence summary、service health |
 | Agent 接入 | 能力发现、TypeScript/Python SDK、ContextPack、MCP 和 cURL 接入 | `/.well-known/akep`、SDK/MCP |
 | 平台设置 | 查看节点、信任域、Policy Epoch 和职责分离 | capability、overview read model |
+
+### 目标运营控制面（尚未实现）
+
+外部接入、持续维护和多团队部署需要新增三个控制面，不能塞进现有“设置”页：
+
+| 页面 | 核心任务 | 安全边界 |
+| --- | --- | --- |
+| Integrations | Owner、workload client、Space/purpose/scope、quota、credential expiry、canary、suspend/retire | 不能发治理权限；secret 只存引用 |
+| Maintenance | due/conflict/incident queue、来源 diff、SLA、Owner 接管、waiver、批次评测 | 自动化只能创建任务/Candidate/证据 |
+| Spaces & Sharing | Tenant/Space Owner、PolicyBinding、成员映射、Shared Space adoption/reference/copy 请求 | Tenant admin 不自动读正文或发布 |
+
+这三个页面的写 API 属于私有控制面，不进入 AKEP Core 协议。当前实现完成
+[外部接入](../architecture/external-integration.md)、
+[持续维护](../governance/knowledge-maintenance.md)和
+[多团队隔离](../architecture/multi-team-isolation.md)的后端门禁之前，不提供“仅前端”的伪管理能力。
 
 ### 用户职责
 

@@ -1,7 +1,7 @@
 # 隔离生产试点运行手册
 
 - 状态：受控单租户试点基线，不是通用生产认证
-- 最近核对：2026-07-16
+- 最近核对：2026-07-17
 - 前置阅读：[实现状态与生产门禁](../architecture/implementation-status.md)
 
 当前仓库适合在单租户、受控网络、可回滚的试点环境中部署，不代表已经通过通用多租户或
@@ -201,3 +201,5 @@ evaluate、review、publish、incident 或 erase。其短期 access token 还必
 
 运行端点与请求约定见[HTTP API 快速参考](../reference/http-api.md)；系统边界见
 [系统概览](../architecture/system-overview.md)。
+外部系统 onboarding 见[接入运行手册](external-system-onboarding.md)；多团队共享运行时在
+[隔离设计](../architecture/multi-team-isolation.md)的迁移与验收完成前保持关闭。

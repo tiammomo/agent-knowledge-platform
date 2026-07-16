@@ -1,7 +1,7 @@
 # 系统概览
 
 - 状态：当前实现概览
-- 最近核对：2026-07-16
+- 最近核对：2026-07-17
 - 适用版本：AKEP v0.1 实验实现
 
 Agent Knowledge Platform 将知识视为“可验证、可治理、可演进的版本化资产”，而不是只把文档
@@ -28,6 +28,12 @@ flowchart LR
 提供可独立验证的规范化、切片和静态扫描能力，但当前不在默认 Compose 中，也没有数据库权限。
 生产 OIDC 和 OTLP 导出已经有实现基线，外部 PDP、对象存储、异步 Worker 调度与 Outbox relay
 仍未进入默认运行时。
+
+外部接入、持续维护和多团队隔离的目标架构分别见：
+
+- [外部系统接入设计](external-integration.md)
+- [知识持续维护](../governance/knowledge-maintenance.md)
+- [多团队隔离与受控共享](multi-team-isolation.md)
 
 ## 2. 组件与边界
 
@@ -139,3 +145,7 @@ Feedback 只形成证据，不能直接修改正文、排名规则或 Published 
 - 理解目标架构：[技术方案 v0.1](technical-design-v0.1.md)
 - 理解协议：[AKEP v0.1](../protocols/akep-v0.1.md)
 - 准备试点：[生产试点运行手册](../runbooks/production-pilot.md)
+- 接入外部系统：[接入设计](external-integration.md)与
+  [接入运行手册](../runbooks/external-system-onboarding.md)
+- 运营知识：[持续维护设计](../governance/knowledge-maintenance.md)
+- 规划团队隔离：[多团队隔离设计](multi-team-isolation.md)

@@ -1,7 +1,7 @@
 # 实现状态与生产门禁
 
 - 状态：可运行的 Phase 1 参考实现；仅限单租户隔离试点
-- 最近核对：2026-07-16
+- 最近核对：2026-07-17
 - 协议：AKEP v0.1 实验草案
 
 本页只描述参考实现当前真正启用的能力。目标架构见
@@ -50,6 +50,9 @@ Web Console 是开发基线而非生产管理面：浏览器内置的 `dev-*` to
 | 能力 | 原因 / 启用门槛 |
 | --- | --- |
 | 外部 PDP 与租户 RLS | 必须完成策略编译、授权计划绑定、租户上下文和越权测试 |
+| 多租户 Principal 与全链路隔离 | 当前 tenant 固定在进程配置，部分事实表无 tenant 列；必须完成全表复合键/RLS、检索/对象/缓存/队列隔离和侧信道测试 |
+| Integration / Connector 控制面 | 当前可人工注册 OIDC client 并使用 REST/SDK/MCP；自助 Integration Registry、Connector runtime、checkpoint、配额/停用尚未实现 |
+| 持续维护调度 | 已有 `reviewAfter`、Attestation、Feedback 和生命周期动作；Owner 目录、due/conflict queue、通知/SLA、来源 checkpoint 尚未实现 |
 | 对象存储与外部接入扫描 | Worker 已有规范化、确定性切片和静态隔离判定；仍须提供对象隔离区、独立恶意文件扫描、媒体解析沙箱和摘要提交协议 |
 | 语义/混合检索 | 必须固定嵌入模型指纹、授权前过滤策略、召回评测和重建流程 |
 | 自动晋级 | 必须有独立评测集、反作弊、相关性折扣、漂移与回滚门禁 |
@@ -67,7 +70,11 @@ Web Console 是开发基线而非生产管理面：浏览器内置的 `dev-*` to
 3. 为所有租户表启用并验证 RLS；策略必须在召回和 `LIMIT` 之前生效。
 4. 将现有 OTLP/Prometheus 基线接入高可用 Collector、长期指标、审计安全日志、备份恢复、密钥轮换、告警和故障演练。
 5. 用威胁样本、权限矩阵、撤销传播、迁移回滚和容量压测完成独立验收。
+6. 落地 Integration/Connector 生命周期和知识 Owner/维护策略/due queue，完成接入停用与
+   Owner 失效演练。
 
 单租户隔离试点部署步骤见[隔离生产试点运行手册](../runbooks/production-pilot.md)。
 本地验证入口见[本地开发手册](../runbooks/local-development.md)，HTTP 运行端点见
 [API 快速参考](../reference/http-api.md)。
+目标接入、持续维护和团队隔离方案见[外部系统接入](external-integration.md)、
+[知识持续维护](../governance/knowledge-maintenance.md)与[多团队隔离](multi-team-isolation.md)。

@@ -1,7 +1,7 @@
 # 信任、评测与发布治理 v0.1
 
 - 状态：Draft policy baseline
-- 最近核对：2026-07-16
+- 最近核对：2026-07-17
 
 本文给出风险与治理基线，不替代组织的法律、隐私、安全或行业审批。参考实现当前固定启用
 `source_document` 与 `procedure` Profile；风险分级表描述扩大资产类型后的最低治理要求。
@@ -124,3 +124,5 @@ Erase 使用独立 `akep:erase`、Privacy/Legal 批准与保留冲突检查；In
 
 运行时角色与请求约定见[HTTP API 快速参考](../reference/http-api.md)，当前已实现门禁见
 [实现状态](../architecture/implementation-status.md)。
+Owner、`reviewAfter`、来源变化、维护任务和退出运营见
+[知识持续维护设计](knowledge-maintenance.md)。

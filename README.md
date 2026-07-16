@@ -9,7 +9,7 @@
 > AKEP（Agent Knowledge Exchange Protocol）是本项目的实验协议草案，不是已发布的公共标准。
 > 当前版本尚未完成多租户、公网生产、监管级擦除或大规模语义检索验收。
 
-[快速开始](#快速开始) · [当前能力](#当前能力) · [Agent 接入](#agent-接入) ·
+[快速开始](#快速开始) · [当前能力](#当前能力) · [接入维护与隔离](#接入维护与隔离) ·
 [文档](#文档) · [生产边界](#生产边界)
 
 ## 为什么不只是 RAG
@@ -144,6 +144,20 @@ Agent 应先读取 `/.well-known/akep`，再按实例声明的 Profile、Operati
 本地 `dev-*` token 只用于非生产角色演示。OIDC 模式下必须使用短期、audience-bound token，
 并通过签名 `akep_obligations` claim 发放调用方真正能够履行的义务。
 
+## 接入、维护与隔离
+
+这三项使用同一套 Tenant/Space、身份、策略、Revision 和事件模型：
+
+| 问题 | 设计结论 | 详细文档 |
+| --- | --- | --- |
+| 外部系统如何快速接入 | Discovery → OIDC workload → 单 Space 只读 canary；REST/SDK/MCP 优先，写入只创建 Candidate | [外部接入设计](docs/architecture/external-integration.md)、[接入手册](docs/runbooks/external-system-onboarding.md) |
+| 知识如何持续维护 | 每个 Published adoption 必须有 Owner、维护策略、来源 checkpoint、`reviewAfter`、证据与明确退出动作 | [持续维护设计](docs/governance/knowledge-maintenance.md) |
+| 团队如何隔离和共享 | Tenant 是硬安全边界，Space 是团队治理边界；团队默认不可互读，经 Shared Space adoption/reference/copy 共享 | [多团队隔离设计](docs/architecture/multi-team-isolation.md)、[ADR-0003](docs/architecture/adr/0003-tenant-space-isolation-and-controlled-sharing.md) |
+
+当前运行时仍是单租户进程模型：外部系统可以人工注册后接入，但 Integration control plane、
+Connector runtime、维护调度器、多租户 Principal/RLS 和 Shared Space workflow 属于目标设计，
+在对应验收门禁完成前不能宣称已经支持多租户。
+
 ## 项目结构
 
 ```text
@@ -172,6 +186,9 @@ Agent 应先读取 `/.well-known/akep`，再按实例声明的 Profile、Operati
 | 主题 | 文档 |
 | --- | --- |
 | 当前组件与数据边界 | [系统概览](docs/architecture/system-overview.md) |
+| 外部系统快速接入 | [接入设计](docs/architecture/external-integration.md)、[运行手册](docs/runbooks/external-system-onboarding.md) |
+| 知识持续维护 | [维护与质量运营](docs/governance/knowledge-maintenance.md) |
+| 多团队隔离/共享 | [隔离设计](docs/architecture/multi-team-isolation.md) |
 | 当前完成度与生产缺口 | [实现状态](docs/architecture/implementation-status.md) |
 | 架构不变量与目标形态 | [技术方案 v0.1](docs/architecture/technical-design-v0.1.md) |
 | AKEP 规范语义 | [协议草案](docs/protocols/akep-v0.1.md) |
@@ -184,11 +201,12 @@ Agent 应先读取 `/.well-known/akep`，再按实例声明的 Profile、Operati
 
 当前实现可以作为受控单租户隔离试点的技术基线，但扩大部署前至少还要完成：
 
-1. 外部 PDP、租户上下文、PostgreSQL RLS 和完整越权测试。
+1. 可信租户 Principal、外部 PDP、全表复合键、PostgreSQL RLS 和完整越权/侧信道测试。
 2. 加密对象存储、隔离上传、独立恶意文件扫描、解析沙箱和擦除证明。
-3. 高可用观测、审计安全日志、备份恢复、密钥轮换、迁移回滚和容量演练。
-4. 语义/混合检索的授权下推、模型指纹、召回评测和重建流程。
-5. 生产 Web 会话、短期 token 刷新、高权限二次确认与安全验收。
+3. Integration/Connector 控制面、维护调度/Owner/SLA、Outbox relay 和停用演练。
+4. 高可用观测、审计安全日志、备份恢复、密钥轮换、迁移回滚和容量演练。
+5. 语义/混合检索的授权下推、模型指纹、召回评测和重建流程。
+6. 生产 Web 会话、短期 token 刷新、高权限二次确认与安全验收。
 
 `NODE_ENV=production` 会拒绝 development auth，不能通过配置绕过。上线前使用
 [试点 Go/No-Go 清单](docs/runbooks/production-pilot.md#0-go-no-go-检查)，不要把当前
