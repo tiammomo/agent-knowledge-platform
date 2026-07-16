@@ -9,7 +9,7 @@ RUN pnpm install --filter @akep/web... --frozen-lockfile
 COPY apps/web apps/web
 RUN pnpm --filter @akep/web build
 
-FROM nginx:1.30.4-alpine@sha256:59d10bca5c674965ef4ff884715000dd60ef5567c36663523f108eec8e4105d4
+FROM nginx:1.31.3-alpine@sha256:2776cd5b70d8983e27e9f5c90abee3d24c690014ae8ecbb529572d954a459096
 COPY infra/docker/web.nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /workspace/apps/web/dist /usr/share/nginx/html
 EXPOSE 8080
