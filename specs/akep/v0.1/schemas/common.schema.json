@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "title": "AKEP v0.1 common definitions",
+  "type": "object",
+  "$defs": {
+    "uri": {
+      "type": "string",
+      "format": "uri",
+      "maxLength": 2048
+    },
+    "httpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "maxLength": 2048
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "revisionId": {
+      "type": "string",
+      "pattern": "^urn:akep:sha256:[a-f0-9]{64}$"
+    },
+    "schemaRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "digest"],
+      "properties": {
+        "uri": { "$ref": "#/$defs/uri" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "obligation": {
+      "oneOf": [
+        { "enum": ["cite", "no-train"] },
+        { "$ref": "#/$defs/schemaRef" }
+      ]
+    },
+    "payloadDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "mediaType", "digest", "size"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "mediaType": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 255
+        },
+        "digest": { "$ref": "#/$defs/digest" },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "schema": { "$ref": "#/$defs/schemaRef" },
+        "language": {
+          "type": "string",
+          "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "type": "string",
+          "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
+        },
+        "jurisdiction": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "validFrom": { "$ref": "#/$defs/timestamp" },
+        "validUntil": { "$ref": "#/$defs/timestamp" },
+        "reviewAfter": { "$ref": "#/$defs/timestamp" },
+        "assumptions": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      }
+    },
+    "softwareRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "digest": { "$ref": "#/$defs/digest" },
+        "uri": { "$ref": "#/$defs/uri" }
+      }
+    },
+    "modelRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "snapshot": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
+      }
+    },
+    "activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["activityId", "type", "endedAt", "used"],
+      "properties": {
+        "activityId": { "$ref": "#/$defs/uri" },
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "actor": { "$ref": "#/$defs/uri" },
+        "startedAt": { "$ref": "#/$defs/timestamp" },
+        "endedAt": { "$ref": "#/$defs/timestamp" },
+        "used": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/uri" }
+        },
+        "software": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/softwareRef" }
+        },
+        "model": { "$ref": "#/$defs/modelRef" },
+        "promptDigest": { "$ref": "#/$defs/digest" },
+        "traceId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attributedTo", "generatedBy"],
+      "properties": {
+        "attributedTo": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uri" }
+        },
+        "generatedBy": { "$ref": "#/$defs/activity" },
+        "primarySources": {
+          "type": "array",
+          "maxItems": 1000,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uri" }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "owners", "export"],
+      "properties": {
+        "classification": {
+          "enum": ["public", "internal", "confidential", "restricted"]
+        },
+        "owners": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uri" }
+        },
+        "accessPolicyRefs": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/schemaRef" }
+        },
+        "usagePolicyRefs": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/schemaRef" }
+        },
+        "licenses": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "allowedPurposes": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._:-]{0,127}$"
+          }
+        },
+        "retentionUntil": { "$ref": "#/$defs/timestamp" },
+        "export": {
+          "enum": ["allow", "metadata_only", "reference_only", "deny"]
+        },
+        "obligations": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/obligation" }
+        }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "target"],
+      "properties": {
+        "type": {
+          "oneOf": [
+            {
+              "enum": [
+                "supports",
+                "contradicts",
+                "supersedes",
+                "refines",
+                "derived_from",
+                "equivalent_to",
+                "applies_under",
+                "invalidates",
+                "evaluates",
+                "used_in"
+              ]
+            },
+            { "$ref": "#/$defs/uri" }
+          ]
+        },
+        "target": { "$ref": "#/$defs/uri" },
+        "scope": { "$ref": "#/$defs/scope" },
+        "evidence": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uri" }
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": {
+        "format": "uri"
+      },
+      "additionalProperties": true,
+      "maxProperties": 100
+    },
+    "critical": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/uri" }
+    }
+  }
+}

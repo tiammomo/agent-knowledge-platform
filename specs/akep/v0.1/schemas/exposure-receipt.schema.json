@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "exposure-receipt.schema.json",
+  "title": "AKEP v0.1 server-issued exposure receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "exposureReceiptId",
+    "kind",
+    "subjectPseudonym",
+    "spaceIds",
+    "purpose",
+    "policyDecisionId",
+    "policyEpoch",
+    "obligations",
+    "citations",
+    "issuedAt",
+    "expiresAt",
+    "critical"
+  ],
+  "properties": {
+    "exposureReceiptId": { "$ref": "common.schema.json#/$defs/uri" },
+    "kind": { "enum": ["query", "revision_read", "blob_read"] },
+    "subjectPseudonym": { "$ref": "common.schema.json#/$defs/digest" },
+    "spaceIds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uri" }
+    },
+    "purpose": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._:-]{0,127}$"
+    },
+    "policyDecisionId": { "$ref": "common.schema.json#/$defs/uri" },
+    "policyEpoch": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "obligations": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/obligation" }
+    },
+    "citations": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/exposedCitation" }
+    },
+    "issuedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "expiresAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": { "enum": ["revision_read", "blob_read"] }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "properties": {
+          "citations": { "type": "array", "minItems": 1 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "exposedCitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "citationId",
+        "spaceId",
+        "revisionId",
+        "payloadDigest",
+        "locator",
+        "qualityDecision",
+        "qualityReasons",
+        "qualityAttestationRefs"
+      ],
+      "properties": {
+        "citationId": { "$ref": "common.schema.json#/$defs/uri" },
+        "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+        "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" },
+        "payloadDigest": { "$ref": "common.schema.json#/$defs/digest" },
+        "locator": { "$ref": "query-result.schema.json#/$defs/locator" },
+        "qualityDecision": {
+          "enum": ["suitable", "suitable_with_warning"]
+        },
+        "qualityReasons": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "qualityAttestationRefs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/uri" }
+        }
+      }
+    }
+  }
+}

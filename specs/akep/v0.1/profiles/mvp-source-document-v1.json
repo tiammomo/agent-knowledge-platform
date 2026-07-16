@@ -1,0 +1,37 @@
+{
+  "profileVersion": "0.1",
+  "profileId": "https://agentknowledge.dev/profiles/source-document/1",
+  "assetType": "source_document",
+  "primaryPayload": {
+    "mediaTypes": [
+      "application/pdf",
+      "text/html; charset=utf-8",
+      "text/markdown; charset=utf-8"
+    ],
+    "languages": ["zh-CN"]
+  },
+  "requiredManifestFields": ["/provenance", "/policy"],
+  "scopeRequirements": [],
+  "allowedRelations": ["derived_from", "supersedes", "contradicts"],
+  "validationRules": [
+    { "ruleId": "media-type-allowlist", "ruleVersion": "1" },
+    { "ruleId": "malware-scan", "ruleVersion": "1" },
+    { "ruleId": "safe-document-parse", "ruleVersion": "1" },
+    { "ruleId": "source-link-check", "ruleVersion": "1" },
+    { "ruleId": "policy-completeness", "ruleVersion": "1" }
+  ],
+  "requiredAttestations": [
+    "provenance-validation",
+    "safety-scan",
+    "license-review"
+  ],
+  "riskClass": "R1",
+  "reviewPolicy": {
+    "minimumIndependentReviewers": 1,
+    "reviewAfterRequired": false,
+    "revalidateOn": ["profile-change", "policy-change", "source-change", "attestation-expiry"]
+  },
+  "automaticPublicationAllowed": false,
+  "extensions": {},
+  "critical": []
+}

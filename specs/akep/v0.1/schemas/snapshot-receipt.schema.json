@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "snapshot-receipt.schema.json",
+  "title": "AKEP v0.1 federation snapshot receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "snapshotId",
+    "status",
+    "acceptedFilter",
+    "expiresAt",
+    "statusUrl",
+    "critical"
+  ],
+  "properties": {
+    "snapshotId": { "$ref": "common.schema.json#/$defs/uri" },
+    "status": { "enum": ["pending", "ready", "failed"] },
+    "acceptedFilter": { "$ref": "snapshot-request.schema.json" },
+    "checkpoint": { "$ref": "signed-checkpoint.schema.json" },
+    "cursor": { "type": "string", "minLength": 1, "maxLength": 8192 },
+    "deliveryId": { "$ref": "common.schema.json#/$defs/uri" },
+    "downloadUrl": {
+      "description": "Authenticated, short-lived snapshot resource; never a reusable bearer URL.",
+      "$ref": "common.schema.json#/$defs/httpsUri"
+    },
+    "snapshotDigest": { "$ref": "common.schema.json#/$defs/digest" },
+    "eventSetDigest": { "$ref": "common.schema.json#/$defs/digest" },
+    "statusUrl": { "$ref": "common.schema.json#/$defs/uri" },
+    "expiresAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "problemRef": { "$ref": "common.schema.json#/$defs/uri" },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "ready" } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["checkpoint", "cursor", "deliveryId", "downloadUrl", "snapshotDigest", "eventSetDigest"],
+        "properties": {
+          "checkpoint": {},
+          "cursor": {},
+          "deliveryId": {},
+          "downloadUrl": {},
+          "snapshotDigest": {},
+          "eventSetDigest": {},
+          "problemRef": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "pending" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "checkpoint": false,
+          "cursor": false,
+          "deliveryId": false,
+          "downloadUrl": false,
+          "snapshotDigest": false,
+          "eventSetDigest": false,
+          "problemRef": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "failed" } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["problemRef"],
+        "properties": {
+          "checkpoint": false,
+          "cursor": false,
+          "deliveryId": false,
+          "downloadUrl": false,
+          "snapshotDigest": false,
+          "eventSetDigest": false,
+          "problemRef": {}
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "akepVersion": "0.1",
+  "spaceId": "https://knowledge.example/spaces/support",
+  "kind": "revoke",
+  "clientSubmissionId": "agent-run-0198/revoke-1",
+  "targetRevisionId": "urn:akep:sha256:645b377464b2d9886f2567066e7d932156b2435df8fcc8d0790e5720129e430d",
+  "rationale": "上游规范被确认包含高风险错误，请立即停止用于新任务。",
+  "evidenceRefs": [
+    "https://incidents.example/2026/refund-policy-17"
+  ],
+  "extensions": {},
+  "critical": []
+}

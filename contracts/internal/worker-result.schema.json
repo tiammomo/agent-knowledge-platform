@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentknowledge.dev/internal/worker-result/0.1",
+  "title": "AKEP internal worker result v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "taskId",
+    "kind",
+    "status",
+    "errors",
+    "critical"
+  ],
+  "properties": {
+    "contractVersion": { "const": "0.1" },
+    "taskId": { "type": "string", "format": "uri", "maxLength": 2048 },
+    "kind": { "enum": ["validate_manifest", "process_payload"] },
+    "status": { "enum": ["valid", "invalid", "processed", "quarantined"] },
+    "computedRevisionId": {
+      "type": "string",
+      "pattern": "^urn:akep:sha256:[a-f0-9]{64}$"
+    },
+    "errors": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "code", "message"],
+        "properties": {
+          "path": { "type": "string", "maxLength": 2048 },
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,127}$"
+          },
+          "message": { "type": "string", "minLength": 1, "maxLength": 5000 }
+        }
+      }
+    },
+    "normalizedContentDigest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "chunks": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["chunkId", "content", "contentDigest", "locator", "ordinal"],
+        "properties": {
+          "chunkId": { "type": "string", "pattern": "^urn:akep:chunk:sha256:[a-f0-9]{64}$" },
+          "content": { "type": "string", "maxLength": 8512 },
+          "contentDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "locator": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["basisDigest", "type", "unit", "start", "end"],
+            "properties": {
+              "basisDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+              "type": { "const": "text-offset" },
+              "unit": { "const": "utf8-byte" },
+              "start": { "type": "integer", "minimum": 0 },
+              "end": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "ordinal": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basisDigest", "externalMalwareScanRequired", "findings", "offsetUnit", "scannerVersion", "verdict"],
+      "properties": {
+        "basisDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "externalMalwareScanRequired": { "type": "boolean" },
+        "findings": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "end", "message", "severity", "start"],
+            "properties": {
+              "code": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{0,127}$" },
+              "end": { "type": "integer", "minimum": 0 },
+              "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+              "severity": { "enum": ["low", "medium", "high"] },
+              "start": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "offsetUnit": { "const": "utf8-byte" },
+        "scannerVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "verdict": { "enum": ["clean", "review", "quarantined"] }
+      }
+    },
+    "critical": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "type": "string", "format": "uri", "maxLength": 2048 }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "validate_manifest" } } },
+      "then": {
+        "required": ["computedRevisionId"],
+        "properties": { "status": { "enum": ["valid", "invalid"] } }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "process_payload" } } },
+      "then": {
+        "required": ["chunks", "normalizedContentDigest", "scan"],
+        "properties": { "status": { "enum": ["invalid", "processed", "quarantined"] } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "valid" } } },
+      "then": { "properties": { "errors": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "invalid" } }, "required": ["status"] },
+      "then": { "properties": { "errors": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["processed", "quarantined"] } } },
+      "then": { "properties": { "errors": { "maxItems": 0 } } }
+    }
+  ]
+}

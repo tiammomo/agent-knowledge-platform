@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "snapshot-stream-header.schema.json",
+  "title": "AKEP v0.1 snapshot NDJSON header",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "snapshotVersion",
+    "deliveryId",
+    "checkpoint",
+    "acceptedFilter",
+    "eventSetDigest",
+    "eventCount",
+    "critical"
+  ],
+  "properties": {
+    "snapshotVersion": { "const": "0.1" },
+    "deliveryId": { "$ref": "common.schema.json#/$defs/uri" },
+    "checkpoint": { "$ref": "signed-checkpoint.schema.json" },
+    "acceptedFilter": { "$ref": "snapshot-request.schema.json" },
+    "eventSetDigest": { "$ref": "common.schema.json#/$defs/digest" },
+    "eventCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  }
+}

@@ -1,0 +1,1641 @@
+openapi: 3.1.2
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: Agent Knowledge Exchange Protocol
+  version: 0.1.0
+  summary: Experimental HTTP binding for persistent, traceable Agent knowledge.
+  description: |
+    AKEP v0.1 Reader, Contributor, Evaluator, Curator, Publisher, and Federation operations.
+    The capability document at `/.well-known/akep` supplies the actual base URL,
+    supported profiles, authorization metadata, limits, and extensions.
+  license:
+    name: Project license pending
+    identifier: LicenseRef-Pending
+servers:
+  - url: https://knowledge.example/akep/0.1
+    description: Illustrative server; replace with discovery baseUrl
+security:
+  - oauth2: []
+tags:
+  - name: Reader
+    description: Query, resolve, and fetch immutable authorized knowledge.
+  - name: Contributor
+    description: Submit candidate knowledge changes and usage evidence.
+  - name: Evaluator
+    description: Record immutable results from independently executed evaluations.
+  - name: Curator
+    description: Validate or reject candidates without publication authority.
+  - name: Publisher
+    description: Apply separately authorized publication and safety decisions.
+  - name: Federation
+    description: Exchange signed, policy-scoped changes between trust domains.
+paths:
+  /.well-known/akep:
+    get:
+      tags: [Reader]
+      operationId: discoverAKEP
+      summary: Discover protocol versions, profiles, authorization, and limits
+      security: []
+      servers:
+        - url: https://knowledge.example
+          description: Node origin rather than the discovered AKEP base URL
+      responses:
+        '200':
+          description: Short-lived capability document
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Cache-Control:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/capability.schema.json
+        '404':
+          $ref: '#/components/responses/Problem'
+  /queries:
+    post:
+      tags: [Reader]
+      operationId: queryKnowledge
+      summary: Query the caller-authorized knowledge set
+      security:
+        - oauth2: [akep:query]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/query.schema.json
+      responses:
+        '200':
+          description: A stable, policy-filtered page of results
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/query-result.schema.json
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+  /context-packs:
+    post:
+      tags: [Reader]
+      operationId: createContextPack
+      summary: Assemble a governed, budget-bounded context package
+      description: |
+        Optional ContextPack extension advertised by the node capability
+        document. It returns citation-ready passages and an Exposure Receipt;
+        it does not introduce a second knowledge identity or bypass Query
+        authorization. This implementation supports lexical and exact modes.
+      security:
+        - oauth2: [akep:query]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/context-pack-request.schema.json
+      responses:
+        '200':
+          description: Deterministic ContextPack for the accepted budget and projection snapshot
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization, AKEP-Purpose, AKEP-Obligation-Support'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/context-pack.schema.json
+        '400':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+  /spaces/{spaceId}/records/{recordId}:
+    get:
+      tags: [Reader]
+      operationId: resolveRecord
+      summary: Resolve the visible heads and trust-domain channels for a record
+      security:
+        - oauth2: [akep:read]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/SpaceId'
+        - $ref: '#/components/parameters/RecordId'
+        - $ref: '#/components/parameters/Purpose'
+        - $ref: '#/components/parameters/ObligationSupport'
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Record resolution
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            ETag:
+              description: Strong ETag for the current mutable resolution representation
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-cache'
+            Vary:
+              schema:
+                const: 'Authorization, AKEP-Purpose, AKEP-Obligation-Support'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/record-resource.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /spaces/{spaceId}/revisions/{revisionId}:
+    get:
+      tags: [Reader]
+      operationId: fetchRevision
+      summary: Fetch an immutable revision manifest in an authorized Space context
+      security:
+        - oauth2: [akep:read]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/SpaceId'
+        - $ref: '#/components/parameters/RevisionId'
+        - $ref: '#/components/parameters/Purpose'
+        - $ref: '#/components/parameters/ObligationSupport'
+        - $ref: '#/components/parameters/Traceparent'
+        - name: If-None-Match
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Immutable revision resource
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Read-Receipt:
+              $ref: '#/components/headers/ReadReceipt'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            AKEP-Quality-Decision:
+              $ref: '#/components/headers/QualityDecision'
+            AKEP-Quality-Attestation:
+              $ref: '#/components/headers/QualityAttestation'
+            ETag:
+              description: Strong ETag of the immutable manifest representation
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-cache'
+            Vary:
+              schema:
+                const: 'Authorization, AKEP-Purpose, AKEP-Obligation-Support'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/revision-resource.schema.json
+        '304':
+          description: Not modified
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Read-Receipt:
+              $ref: '#/components/headers/ReadReceipt'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            AKEP-Quality-Decision:
+              $ref: '#/components/headers/QualityDecision'
+            AKEP-Quality-Attestation:
+              $ref: '#/components/headers/QualityAttestation'
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-cache'
+            Vary:
+              schema:
+                const: 'Authorization, AKEP-Purpose, AKEP-Obligation-Support'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /spaces/{spaceId}/revisions/{revisionId}/blobs/{digest}:
+    get:
+      tags: [Reader]
+      operationId: fetchBlob
+      summary: Fetch authorized payload bytes and verify them against the digest
+      description: |
+        The server MUST first resolve the authorized immutable Manifest and
+        verify that the path digest is one of that Revision's payload
+        descriptors. A digest that is valid globally but absent from this
+        Revision is handled as an undisclosed not-found result.
+      security:
+        - oauth2: [akep:read]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/SpaceId'
+        - $ref: '#/components/parameters/RevisionId'
+        - $ref: '#/components/parameters/Digest'
+        - $ref: '#/components/parameters/Purpose'
+        - $ref: '#/components/parameters/ObligationSupport'
+        - $ref: '#/components/parameters/Traceparent'
+        - name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+            pattern: '^bytes=[0-9]*-[0-9]*$'
+      responses:
+        '200':
+          description: Entire payload
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Read-Receipt:
+              $ref: '#/components/headers/ReadReceipt'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            AKEP-Quality-Decision:
+              $ref: '#/components/headers/QualityDecision'
+            AKEP-Quality-Attestation:
+              $ref: '#/components/headers/QualityAttestation'
+            Content-Digest:
+              description: RFC 9530 digest of the HTTP message content; receivers also verify the AKEP payload digest
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization, AKEP-Purpose, AKEP-Obligation-Support'
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                contentMediaType: application/octet-stream
+        '206':
+          description: Requested byte range
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Read-Receipt:
+              $ref: '#/components/headers/ReadReceipt'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            AKEP-Quality-Decision:
+              $ref: '#/components/headers/QualityDecision'
+            AKEP-Quality-Attestation:
+              $ref: '#/components/headers/QualityAttestation'
+            Content-Range:
+              schema:
+                type: string
+            Content-Digest:
+              description: RFC 9530 digest of the returned range content
+              schema:
+                type: string
+            Repr-Digest:
+              description: RFC 9530 digest of the complete selected representation
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization, AKEP-Purpose, AKEP-Obligation-Support'
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                contentMediaType: application/octet-stream
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '416':
+          $ref: '#/components/responses/Problem'
+  /spaces/{spaceId}/attestations:
+    post:
+      tags: [Evaluator, Curator, Publisher]
+      operationId: createAttestation
+      summary: Persist an immutable review or validation statement
+      description: |
+        The issuer must equal the authenticated principal. Generic callers
+        cannot mint benchmark-result statements; those are created only by a
+        completed EvaluationRun. schema-validation and safety-scan are also
+        reserved for checks actually executed by the node.
+      security:
+        - oauth2: [akep:evaluate]
+        - oauth2: [akep:review]
+        - oauth2: [akep:publish]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/SpaceId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/attestation.schema.json
+      responses:
+        '201':
+          description: Immutable Attestation persisted idempotently
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            Location:
+              schema:
+                type: string
+                format: uri
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/attestation.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /spaces/{spaceId}/attestations/{attestationId}:
+    get:
+      tags: [Reader]
+      operationId: fetchAttestation
+      summary: Fetch an authorized immutable validation or review statement
+      security:
+        - oauth2: [akep:read]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/SpaceId'
+        - $ref: '#/components/parameters/Purpose'
+        - name: attestationId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Attestation statement; verify its referenced envelope when present
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-cache'
+            Vary:
+              schema:
+                const: 'Authorization, AKEP-Purpose'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/attestation.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /evaluation-runs:
+    post:
+      tags: [Evaluator]
+      operationId: createEvaluationRun
+      summary: Record a completed evaluation and mint its benchmark Attestation
+      description: |
+        The service evaluates declared metrics against required and advisory
+        thresholds, stores an immutable EvaluationRun, and atomically creates
+        its benchmark-result Attestation. A failed required gate cannot satisfy
+        publication quality policy.
+      security:
+        - oauth2: [akep:evaluate]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/evaluation-run-request.schema.json
+      responses:
+        '201':
+          description: Completed immutable EvaluationRun
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            Location:
+              schema:
+                type: string
+                format: uri
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/evaluation-run.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /evaluation-runs/{runId}:
+    get:
+      tags: [Reader]
+      operationId: fetchEvaluationRun
+      summary: Fetch an authorized immutable EvaluationRun
+      security:
+        - oauth2: [akep:read]
+        - oauth2: [akep:review]
+        - oauth2: [akep:publish]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/Purpose'
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Immutable EvaluationRun and its quality-gate outcome
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-cache'
+            Vary:
+              schema:
+                const: 'Authorization, AKEP-Purpose'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/evaluation-run.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /spaces/{spaceId}/lifecycle-events/{eventId}:
+    get:
+      tags: [Reader]
+      operationId: fetchLifecycleEvent
+      summary: Fetch an authorized immutable Channel or Status event
+      security:
+        - oauth2: [akep:read]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/SpaceId'
+        - $ref: '#/components/parameters/Purpose'
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Lifecycle event
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-cache'
+            Vary:
+              schema:
+                const: 'Authorization, AKEP-Purpose'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/lifecycle-event.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /exposure-receipts/{exposureReceiptId}:
+    get:
+      tags: [Reader]
+      operationId: fetchExposureReceipt
+      summary: Fetch the subject-bound citations minted by a Query or direct read
+      description: |
+        The authenticated caller MUST be the exposure subject or an explicit
+        delegate. This resource makes direct Revision and Blob reads usable by
+        the Usage flow without trusting client-minted Citation identifiers.
+      security:
+        - oauth2: [akep:read]
+        - oauth2: [akep:query]
+        - oauth2: [akep:feedback]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - name: exposureReceiptId
+          in: path
+          required: true
+          description: Percent-encoded canonical Exposure Receipt URI or local opaque ID
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Short-lived server-issued Exposure Receipt
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/exposure-receipt.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '410':
+          $ref: '#/components/responses/Problem'
+  /ingestions:
+    post:
+      tags: [Contributor]
+      operationId: createIngestion
+      summary: Upload one raw document for isolated scanning and server-managed parsing
+      description: |
+        This MVP endpoint is intentionally bounded to one multipart object and
+        the discovered maxPayloadBytes. Resumable or remote import is a future
+        extension. A successful parse creates a normal candidate Contribution.
+      security:
+        - oauth2: [akep:contribute]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [metadata, content]
+              properties:
+                metadata:
+                  $ref: ./schemas/ingestion.schema.json
+                content:
+                  type: string
+                  contentMediaType: application/octet-stream
+            encoding:
+              metadata:
+                contentType: application/json
+              content:
+                contentType: application/octet-stream
+      responses:
+        '202':
+          description: Raw content persisted in quarantine and queued for scanning
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/ingestion-receipt.schema.json
+        '409':
+          $ref: '#/components/responses/Problem'
+        '413':
+          $ref: '#/components/responses/Problem'
+        '415':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /ingestions/{ingestionId}:
+    get:
+      tags: [Contributor]
+      operationId: getIngestion
+      summary: Read the isolated ingestion and candidate creation status
+      security:
+        - oauth2: [akep:contribute]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - name: ingestionId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Ingestion receipt
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/ingestion-receipt.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /contributions:
+    post:
+      tags: [Contributor]
+      operationId: createContribution
+      summary: Submit a candidate contribution; this never directly publishes
+      security:
+        - oauth2: [akep:contribute]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/contribution.schema.json
+      responses:
+        '201':
+          description: Candidate accepted synchronously
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            ETag:
+              description: Strong ETag of the current Contribution workflow state
+              schema:
+                type: string
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/contribution-receipt.schema.json
+        '202':
+          description: Candidate accepted for asynchronous validation
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            ETag:
+              description: Strong ETag of the current Contribution workflow state
+              schema:
+                type: string
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/contribution-receipt.schema.json
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/Problem'
+  /contributions/{contributionId}:
+    get:
+      tags: [Contributor]
+      operationId: getContribution
+      summary: Read an authorized contribution receipt and current workflow status
+      security:
+        - oauth2: [akep:contribute]
+        - oauth2: [akep:review]
+        - oauth2: [akep:publish]
+        - oauth2: [akep:incident]
+        - oauth2: [akep:erase]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - name: contributionId
+          in: path
+          required: true
+          description: Percent-encoded canonical contribution URI or local ID
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Contribution receipt
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            ETag:
+              description: Strong ETag of the current Contribution workflow state
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/contribution-receipt.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /contributions/{contributionId}/evidence:
+    post:
+      tags: [Contributor]
+      operationId: amendContributionEvidence
+      summary: Add evidence requested by review without changing the frozen Revision
+      description: Only the original contributor or an explicit delegate may amend a needs_evidence Contribution.
+      security:
+        - oauth2: [akep:contribute]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WorkflowIfMatch'
+        - $ref: '#/components/parameters/ContributionId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/contribution-amendment.schema.json
+      responses:
+        '200':
+          $ref: '#/components/responses/ContributionWorkflowResult'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /contributions/{contributionId}/withdraw:
+    post:
+      tags: [Contributor]
+      operationId: withdrawContribution
+      summary: Withdraw an unaccepted Contribution without deleting its audit history
+      description: Only the original contributor or an explicit delegate may withdraw a non-terminal Contribution.
+      security:
+        - oauth2: [akep:contribute]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WorkflowIfMatch'
+        - $ref: '#/components/parameters/ContributionId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/contribution-withdrawal.schema.json
+      responses:
+        '200':
+          $ref: '#/components/responses/ContributionWorkflowResult'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /contributions/{contributionId}/decisions:
+    post:
+      tags: [Curator]
+      operationId: decideContribution
+      summary: Apply a review decision; this operation cannot publish
+      description: |
+        Review writes only the review Decision/Attestation and Contribution
+        workflow state. It MUST NOT update a Channel, safety status, policy
+        epoch, publication audit fact, or publication Outbox entry.
+      security:
+        - oauth2: [akep:review]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: If-Match
+          in: header
+          required: true
+          description: Current strong ETag of the Contribution workflow state
+          schema:
+            type: string
+        - name: contributionId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/decision.schema.json
+      responses:
+        '200':
+          description: Updated contribution receipt
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/contribution-receipt.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /contributions/{contributionId}/actions/publish:
+    post:
+      tags: [Publisher]
+      operationId: publishContribution
+      summary: Publish a verified create or revise Contribution
+      description: The stored Contribution kind MUST be create or revise.
+      security:
+        - oauth2: [akep:publish]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WorkflowIfMatch'
+        - $ref: '#/components/parameters/ContributionId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        $ref: '#/components/requestBodies/GovernanceDecision'
+      responses:
+        '200':
+          $ref: '#/components/responses/GovernanceDecisionResult'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /contributions/{contributionId}/actions/deprecate:
+    post:
+      tags: [Publisher]
+      operationId: deprecateContribution
+      summary: Apply a verified deprecate Contribution
+      description: The stored Contribution kind MUST be deprecate.
+      security:
+        - oauth2: [akep:publish]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WorkflowIfMatch'
+        - $ref: '#/components/parameters/ContributionId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        $ref: '#/components/requestBodies/GovernanceDecision'
+      responses:
+        '200':
+          $ref: '#/components/responses/GovernanceDecisionResult'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /contributions/{contributionId}/actions/revoke:
+    post:
+      tags: [Publisher]
+      operationId: revokeContribution
+      summary: Apply an incident-authorized revoke Contribution
+      description: The stored Contribution kind MUST be revoke; publish scope alone is insufficient.
+      security:
+        - oauth2: [akep:incident]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WorkflowIfMatch'
+        - $ref: '#/components/parameters/ContributionId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        $ref: '#/components/requestBodies/GovernanceDecision'
+      responses:
+        '200':
+          $ref: '#/components/responses/GovernanceDecisionResult'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /contributions/{contributionId}/actions/erase:
+    post:
+      tags: [Publisher]
+      operationId: eraseContribution
+      summary: Apply a privacy/legal-authorized erase Contribution
+      description: The stored Contribution kind MUST be erase; incident or publish scope is insufficient.
+      security:
+        - oauth2: [akep:erase]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/WorkflowIfMatch'
+        - $ref: '#/components/parameters/ContributionId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        $ref: '#/components/requestBodies/GovernanceDecision'
+      responses:
+        '200':
+          $ref: '#/components/responses/GovernanceDecisionResult'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /usages:
+    post:
+      tags: [Contributor]
+      operationId: recordUsage
+      summary: Bind actually used citations to a server-issued exposure receipt
+      description: |
+        The server verifies that every Citation was present in the referenced
+        Query or Read receipt and that the authenticated subject may report its
+        use. The returned usageId is required for Feedback.
+      security:
+        - oauth2: [akep:feedback]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/usage.schema.json
+      responses:
+        '201':
+          description: Usage receipt bound to subject, policy epoch, and citations
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/usage-receipt.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /feedback:
+    post:
+      tags: [Contributor]
+      operationId: submitFeedback
+      summary: Record usage evidence without directly changing knowledge or rank
+      security:
+        - oauth2: [akep:feedback]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/feedback.schema.json
+      responses:
+        '202':
+          description: Feedback accepted as candidate evidence
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            AKEP-Policy-Epoch:
+              $ref: '#/components/headers/PolicyEpoch'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/feedback-receipt.schema.json
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /snapshots:
+    post:
+      tags: [Federation]
+      operationId: createSnapshot
+      summary: Start a policy-scoped federation bootstrap snapshot
+      security:
+        - oauth2: [akep:federate]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/snapshot-request.schema.json
+      responses:
+        '201':
+          description: Snapshot is ready
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: ./schemas/snapshot-receipt.schema.json
+                  - type: object
+                    properties:
+                      status:
+                        const: ready
+        '202':
+          description: Snapshot creation is pending
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: ./schemas/snapshot-receipt.schema.json
+                  - type: object
+                    properties:
+                      status:
+                        const: pending
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+  /snapshots/{snapshotId}:
+    get:
+      tags: [Federation]
+      operationId: getSnapshot
+      summary: Read bootstrap status, accepted filter, checkpoint, and first cursor
+      security:
+        - oauth2: [akep:federate]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - name: snapshotId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Snapshot receipt
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/snapshot-receipt.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '410':
+          description: Snapshot expired; create a replacement at the Location endpoint
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Location:
+              description: Authorized endpoint for creating a replacement Snapshot
+              schema:
+                type: string
+                format: uri
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+          content:
+            application/problem+json:
+              schema:
+                $ref: ./schemas/problem.schema.json
+  /snapshots/{snapshotId}/content:
+    get:
+      tags: [Federation]
+      operationId: downloadSnapshotContent
+      summary: Download the authenticated, digest-bound snapshot NDJSON archive
+      description: |
+        The first line validates against snapshot-stream-header.schema.json;
+        each following line is a DSSE event envelope. Every line is JCS JSON
+        encoded as UTF-8 and terminated by LF, including the final line. The
+        receipt snapshotDigest covers the exact complete archive bytes. The
+        endpoint is same-origin, never redirects, and does not accept bearer
+        credentials in the URL.
+      security:
+        - oauth2: [akep:federate]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - name: snapshotId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+            pattern: '^bytes=[0-9]*-[0-9]*$'
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '200':
+          description: Complete snapshot archive
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Content-Digest:
+              description: RFC 9530 digest of the complete archive bytes
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization'
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                contentMediaType: application/x-ndjson
+        '206':
+          description: Requested archive byte range
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Content-Range:
+              schema:
+                type: string
+            Content-Digest:
+              description: RFC 9530 digest of the returned range
+              schema:
+                type: string
+            Repr-Digest:
+              description: RFC 9530 digest of the complete archive representation
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization'
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                contentMediaType: application/x-ndjson
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '410':
+          $ref: '#/components/responses/Problem'
+        '416':
+          $ref: '#/components/responses/Problem'
+  /changes:
+    get:
+      tags: [Federation]
+      operationId: listChanges
+      summary: Read a signed, policy-scoped federation change page
+      security:
+        - oauth2: [akep:federate]
+      description: |
+        Every event is a DSSE envelope whose payload is JCS-canonicalized
+        CloudEvents JSON. A remote published event is imported locally as a
+        candidate until local policy and governance approve it.
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/Traceparent'
+        - name: cursor
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 8192
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+      responses:
+        '200':
+          description: Signed change page
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+            Vary:
+              schema:
+                const: 'Authorization'
+          content:
+            application/json:
+              schema:
+                $ref: ./schemas/change-page.schema.json
+        '403':
+          $ref: '#/components/responses/Problem'
+        '410':
+          description: Cursor expired; bootstrap again from the Location snapshot endpoint
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+            Location:
+              description: Authorized endpoint for creating a replacement Snapshot
+              schema:
+                type: string
+                format: uri
+            Cache-Control:
+              schema:
+                const: 'private, no-store'
+          content:
+            application/problem+json:
+              schema:
+                $ref: ./schemas/problem.schema.json
+        '429':
+          $ref: '#/components/responses/Problem'
+  /deliveries/{deliveryId}/ack:
+    post:
+      tags: [Federation]
+      operationId: acknowledgeDelivery
+      summary: Acknowledge only after durable persistence and local policy application
+      security:
+        - oauth2: [akep:federate]
+      parameters:
+        - $ref: '#/components/parameters/AKEPVersion'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ./schemas/delivery-ack.schema.json
+      responses:
+        '204':
+          description: Acknowledgement persisted idempotently
+          headers:
+            AKEP-Version:
+              $ref: '#/components/headers/AKEPVersion'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+components:
+  parameters:
+    AKEPVersion:
+      name: AKEP-Version
+      in: header
+      required: true
+      schema:
+        const: '0.1'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Opaque key scoped to authenticated caller and operation
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 255
+    Traceparent:
+      name: traceparent
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+    Purpose:
+      name: AKEP-Purpose
+      in: header
+      required: true
+      description: Requested use; it narrows but never grants token authority
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9._:-]{0,127}$'
+    ObligationSupport:
+      name: AKEP-Obligation-Support
+      in: header
+      required: true
+      description: |
+        Unpadded base64url of the RFC 8785 JCS UTF-8 encoding of a JSON array
+        that follows Query.supportedObligations. For example, `cite` plus
+        `no-train` is `WyJjaXRlIiwibm8tdHJhaW4iXQ`. The server intersects
+        this claim with authenticated client registration; it never grants
+        authority and MUST fail closed before returning protected content.
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 16384
+        pattern: '^[A-Za-z0-9_-]+$'
+    SpaceId:
+      name: spaceId
+      in: path
+      required: true
+      description: Percent-encoded canonical Space URI
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 2048
+    RecordId:
+      name: recordId
+      in: path
+      required: true
+      description: Percent-encoded canonical record URI
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 2048
+    RevisionId:
+      name: revisionId
+      in: path
+      required: true
+      description: Percent-encoded v0.1 SHA-256 Revision ID
+      schema:
+        type: string
+        pattern: '^urn:akep:sha256:[a-f0-9]{64}$'
+    Digest:
+      name: digest
+      in: path
+      required: true
+      description: Percent-encoded v0.1 SHA-256 payload digest
+      schema:
+        type: string
+        pattern: '^sha256:[a-f0-9]{64}$'
+    ContributionId:
+      name: contributionId
+      in: path
+      required: true
+      description: Percent-encoded canonical Contribution URI or local ID
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 2048
+    WorkflowIfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Current strong ETag of the Contribution workflow state
+      schema:
+        type: string
+  requestBodies:
+    GovernanceDecision:
+      required: true
+      description: |
+        The path determines the action. The server MUST bind it to the stored
+        Contribution kind, ETag, authenticated actor, expected policy epoch,
+        and applicable separation-of-duty policy. Decision, LifecycleEvent,
+        Channel/status overlay, new policy epoch, authoritative audit fact, and
+        Outbox are one database transaction.
+      content:
+        application/json:
+          schema:
+            $ref: ./schemas/publication-decision.schema.json
+  headers:
+    AKEPVersion:
+      description: Negotiated AKEP protocol version
+      schema:
+        const: '0.1'
+    PolicyEpoch:
+      description: Opaque epoch of the effective local policy snapshot
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+    ReadReceipt:
+      description: Server-issued Exposure Receipt URI; fetch it before using the content or recording Usage
+      schema:
+        type: string
+        format: uri
+    QualityDecision:
+      description: Reader-visible quality decision; insufficient or unsuitable content is not distributed
+      schema:
+        enum: [suitable, suitable_with_warning]
+    QualityAttestation:
+      description: Primary authorized Attestation URI carrying the decision reasons; the Exposure Receipt contains the complete set
+      schema:
+        type: string
+        format: uri
+  responses:
+    ContributionWorkflowResult:
+      description: Updated Contribution workflow receipt
+      headers:
+        AKEP-Version:
+          $ref: '#/components/headers/AKEPVersion'
+        AKEP-Policy-Epoch:
+          $ref: '#/components/headers/PolicyEpoch'
+        ETag:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: ./schemas/contribution-receipt.schema.json
+    GovernanceDecisionResult:
+      description: Updated Contribution receipt after the atomic governance action
+      headers:
+        AKEP-Version:
+          $ref: '#/components/headers/AKEPVersion'
+        AKEP-Policy-Epoch:
+          $ref: '#/components/headers/PolicyEpoch'
+        ETag:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: ./schemas/contribution-receipt.schema.json
+    Problem:
+      description: RFC 9457 problem details
+      headers:
+        AKEP-Version:
+          $ref: '#/components/headers/AKEPVersion'
+        Cache-Control:
+          schema:
+            const: 'private, no-store'
+      content:
+        application/problem+json:
+          schema:
+            $ref: ./schemas/problem.schema.json
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: |
+        Illustrative OAuth metadata. Clients must use the authorization server
+        discovered from RFC 9728 protected resource metadata.
+      flows:
+        clientCredentials:
+          tokenUrl: https://identity.example/oauth2/token
+          scopes:
+            akep:read: Read authorized immutable revisions
+            akep:query: Query authorized knowledge
+            akep:contribute: Submit candidate contributions
+            akep:feedback: Submit usage evidence
+            akep:review: Review and decide candidate contributions
+            akep:publish: Publish or deprecate verified contributions
+            akep:incident: Apply emergency revoke to a verified revoke contribution
+            akep:erase: Apply privacy/legal erasure to a verified erase contribution
+            akep:federate: Exchange signed federation changes

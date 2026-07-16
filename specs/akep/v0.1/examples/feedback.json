@@ -1,0 +1,41 @@
+{
+  "akepVersion": "0.1",
+  "feedbackId": "urn:uuid:0198a1d2-82d5-7b43-8d2d-6af93e78c003",
+  "usageId": "urn:uuid:0198a1d2-82d5-7b43-8d2d-6af93e78c004",
+  "citations": [
+    {
+      "citationId": "urn:uuid:0198a1d2-82d5-7b43-8d2d-6af93e78c002",
+      "revisionId": "urn:akep:sha256:645b377464b2d9886f2567066e7d932156b2435df8fcc8d0790e5720129e430d",
+      "payloadDigest": "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+      "locator": {
+        "type": "text-offset",
+        "start": 120,
+        "end": 248
+      },
+      "outcome": "helped"
+    }
+  ],
+  "taskCategory": "customer-support/refund",
+  "outcome": "helped",
+  "metrics": [
+    {
+      "name": "resolution.success",
+      "value": 1,
+      "unit": "boolean"
+    }
+  ],
+  "evaluatorVersion": {
+    "uri": "https://knowledge.example/evaluators/support-outcome/2",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "contextDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "evidenceRefs": [],
+  "observedAt": "2026-07-15T02:05:00Z",
+  "privacy": {
+    "rawTaskStored": false,
+    "aggregation": "pseudonymized",
+    "retentionUntil": "2026-08-15T00:00:00Z"
+  },
+  "extensions": {},
+  "critical": []
+}

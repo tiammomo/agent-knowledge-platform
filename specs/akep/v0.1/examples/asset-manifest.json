@@ -1,0 +1,96 @@
+{
+  "manifestVersion": "0.1",
+  "recordId": "https://knowledge.example/assets/refund-policy",
+  "profile": {
+    "uri": "https://agentknowledge.dev/profiles/procedure/1",
+    "digest": "sha256:aae83aa5cd8d97cba553b453544d89e97609c6d91a57109b3ed5ee4897e648b4"
+  },
+  "parents": [],
+  "assetType": "procedure",
+  "title": "退款处理流程",
+  "summary": "直营网店超过 30 天退款申请的复核流程。",
+  "payloads": [
+    {
+      "name": "primary",
+      "mediaType": "text/markdown; charset=utf-8",
+      "digest": "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+      "size": 1842,
+      "language": "zh-CN"
+    }
+  ],
+  "scope": {
+    "locale": "zh-CN",
+    "jurisdiction": "CN",
+    "validFrom": "2026-07-01T00:00:00Z",
+    "reviewAfter": "2026-10-01T00:00:00Z",
+    "assumptions": [
+      "仅适用于直营网店"
+    ]
+  },
+  "provenance": {
+    "attributedTo": [
+      "https://identity.example/teams/support"
+    ],
+    "generatedBy": {
+      "activityId": "urn:uuid:0198a1d2-82d5-7b43-8d2d-6af93e78c001",
+      "type": "human-authored",
+      "actor": "https://identity.example/teams/support",
+      "startedAt": "2026-07-15T01:00:00Z",
+      "endedAt": "2026-07-15T01:02:03Z",
+      "used": [
+        "https://docs.example/policies/refund-2026-07"
+      ],
+      "software": [
+        {
+          "name": "knowledge-editor",
+          "version": "1.0.0"
+        }
+      ],
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+    },
+    "primarySources": [
+      "https://docs.example/policies/refund-2026-07"
+    ]
+  },
+  "policy": {
+    "classification": "internal",
+    "owners": [
+      "https://identity.example/teams/support"
+    ],
+    "accessPolicyRefs": [
+      {
+        "uri": "https://policy.example/access/support-v2",
+        "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "usagePolicyRefs": [
+      {
+        "uri": "https://policy.example/usage/internal-knowledge-v1",
+        "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    ],
+    "licenses": [
+      "LicenseRef-Company-Internal"
+    ],
+    "allowedPurposes": [
+      "customer-support"
+    ],
+    "export": "deny",
+    "obligations": [
+      "cite",
+      "no-train"
+    ]
+  },
+  "relations": [
+    {
+      "type": "derived_from",
+      "target": "https://docs.example/policies/refund-2026-07"
+    }
+  ],
+  "labels": [
+    "refund",
+    "support"
+  ],
+  "extensions": {},
+  "critical": []
+}

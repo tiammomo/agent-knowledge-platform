@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+.coverage
+htmlcov/
+.venv/
+.uv-cache/
+*.egg-info/
+postgres-data/

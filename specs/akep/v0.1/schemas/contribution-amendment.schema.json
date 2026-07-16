@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contribution-amendment.schema.json",
+  "title": "AKEP v0.1 contribution evidence amendment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["akepVersion", "amendmentId", "rationale", "evidenceRefs", "critical"],
+  "properties": {
+    "akepVersion": { "const": "0.1" },
+    "amendmentId": { "$ref": "common.schema.json#/$defs/uri" },
+    "rationale": { "type": "string", "minLength": 1, "maxLength": 20000 },
+    "evidenceRefs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uri" }
+    },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  }
+}

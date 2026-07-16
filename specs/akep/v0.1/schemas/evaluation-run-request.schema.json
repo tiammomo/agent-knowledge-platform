@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evaluation-run-request.schema.json",
+  "title": "AKEP v0.1 EvaluationRun request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "akepVersion",
+    "clientRunId",
+    "spaceId",
+    "revisionId",
+    "startedAt",
+    "completedAt",
+    "expiresAt",
+    "dataset",
+    "evaluator",
+    "metrics",
+    "thresholds",
+    "summary",
+    "evidenceRefs",
+    "critical"
+  ],
+  "properties": {
+    "akepVersion": { "const": "0.1" },
+    "clientRunId": { "$ref": "common.schema.json#/$defs/uri" },
+    "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+    "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" },
+    "startedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "completedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "expiresAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "dataset": { "$ref": "common.schema.json#/$defs/schemaRef" },
+    "evaluator": { "$ref": "common.schema.json#/$defs/schemaRef" },
+    "metrics": { "$ref": "#/$defs/metrics" },
+    "thresholds": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 100,
+      "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$" },
+      "additionalProperties": { "$ref": "#/$defs/threshold" }
+    },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 5000 },
+    "evidenceRefs": {
+      "type": "array",
+      "maxItems": 1000,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uri" }
+    },
+    "critical": { "type": "array", "maxItems": 0 }
+  },
+  "$defs": {
+    "metrics": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 100,
+      "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$" },
+      "additionalProperties": { "type": "number" }
+    },
+    "threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator", "value"],
+      "properties": {
+        "operator": { "enum": ["gte", "lte"] },
+        "required": { "type": "boolean", "default": true },
+        "value": { "type": "number" }
+      }
+    }
+  }
+}

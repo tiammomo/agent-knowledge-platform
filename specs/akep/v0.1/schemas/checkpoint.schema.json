@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "checkpoint.schema.json",
+  "title": "AKEP v0.1 federation checkpoint payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpointVersion",
+    "checkpointId",
+    "issuer",
+    "audience",
+    "filterDigest",
+    "positions",
+    "issuedAt",
+    "expiresAt",
+    "critical"
+  ],
+  "properties": {
+    "checkpointVersion": { "const": "0.1" },
+    "checkpointId": { "$ref": "common.schema.json#/$defs/uri" },
+    "issuer": { "$ref": "common.schema.json#/$defs/uri" },
+    "audience": { "$ref": "common.schema.json#/$defs/uri" },
+    "filterDigest": { "$ref": "common.schema.json#/$defs/digest" },
+    "positions": {
+      "type": "array",
+      "maxItems": 10000,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["streamId", "epoch", "sequence", "lastEventHash"],
+        "properties": {
+          "streamId": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "epoch": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+          "sequence": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "lastEventHash": { "$ref": "common.schema.json#/$defs/digest" }
+        }
+      }
+    },
+    "issuedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "expiresAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  }
+}

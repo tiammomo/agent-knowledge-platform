@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "context-pack.schema.json",
+  "title": "AKEP v0.1 ContextPack extension response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contextPackId",
+    "contextDigest",
+    "createdAt",
+    "task",
+    "purpose",
+    "policyEpoch",
+    "snapshot",
+    "projectionGeneration",
+    "exposureReceiptId",
+    "budget",
+    "passages",
+    "citations",
+    "obligations",
+    "quality",
+    "warnings"
+  ],
+  "properties": {
+    "contextPackId": {
+      "type": "string",
+      "pattern": "^urn:akep:context:sha256:[a-f0-9]{64}$"
+    },
+    "contextDigest": { "$ref": "common.schema.json#/$defs/digest" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "task": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32000
+    },
+    "purpose": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._:-]{0,127}$"
+    },
+    "policyEpoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "snapshot": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    },
+    "projectionGeneration": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "exposureReceiptId": { "$ref": "common.schema.json#/$defs/uri" },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxCharacters",
+        "maxPassages",
+        "estimatedTokens",
+        "usedCharacters",
+        "usedPassages"
+      ],
+      "properties": {
+        "maxCharacters": { "type": "integer", "minimum": 1, "maximum": 128000 },
+        "maxPassages": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "maxTokens": { "type": "integer", "minimum": 1, "maximum": 64000 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "usedCharacters": { "type": "integer", "minimum": 0 },
+        "usedPassages": { "type": "integer", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "passages": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/passage" }
+    },
+    "citations": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/citation" }
+    },
+    "obligations": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/obligation" }
+    },
+    "quality": { "$ref": "#/$defs/quality" },
+    "warnings": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/warning" }
+    }
+  },
+  "$defs": {
+    "locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "start", "end"],
+      "properties": {
+        "type": { "const": "text-offset" },
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "citationId",
+        "chunkId",
+        "payloadDigest",
+        "locator",
+        "quote",
+        "recordId",
+        "revisionId",
+        "spaceId"
+      ],
+      "properties": {
+        "citationId": { "$ref": "common.schema.json#/$defs/uri" },
+        "chunkId": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "payloadDigest": { "$ref": "common.schema.json#/$defs/digest" },
+        "locator": { "$ref": "#/$defs/locator" },
+        "quote": { "type": "string", "maxLength": 32000 },
+        "recordId": { "$ref": "common.schema.json#/$defs/uri" },
+        "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" },
+        "spaceId": { "$ref": "common.schema.json#/$defs/uri" }
+      }
+    },
+    "passage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "citationId",
+        "chunkId",
+        "rank",
+        "recordId",
+        "revisionId",
+        "score",
+        "spaceId",
+        "text",
+        "title"
+      ],
+      "properties": {
+        "citationId": { "$ref": "common.schema.json#/$defs/uri" },
+        "chunkId": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "rank": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "recordId": { "$ref": "common.schema.json#/$defs/uri" },
+        "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" },
+        "score": { "type": "number" },
+        "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+        "text": { "type": "string", "maxLength": 32000 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attestationRefs",
+        "citationCoverage",
+        "decision",
+        "lexicalCoverage",
+        "reasons"
+      ],
+      "properties": {
+        "attestationRefs": {
+          "type": "array",
+          "maxItems": 1000,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/uri" }
+        },
+        "citationCoverage": { "type": "number", "minimum": 0, "maximum": 1 },
+        "decision": { "enum": ["suitable", "suitable_with_warning", "insufficient"] },
+        "lexicalCoverage": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reasons": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "type": "string", "maxLength": 5000 }
+        }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "enum": [
+            "AKEP_CONTEXT_INSUFFICIENT",
+            "AKEP_CONTEXT_BUDGET_TRUNCATED",
+            "AKEP_CONTEXT_QUALITY_WARNING",
+            "AKEP_CONTEXT_DEPRECATED"
+          ]
+        },
+        "message": { "type": "string", "minLength": 1, "maxLength": 5000 },
+        "revisionIds": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/revisionId" }
+        }
+      }
+    }
+  }
+}

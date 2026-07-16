@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "revision-resource.schema.json",
+  "title": "AKEP v0.1 revision resource",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["revisionId", "manifest"],
+  "properties": {
+    "revisionId": {
+      "$ref": "common.schema.json#/$defs/revisionId"
+    },
+    "manifest": {
+      "$ref": "asset-manifest.schema.json"
+    }
+  }
+}

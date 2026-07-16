@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "problem.schema.json",
+  "title": "AKEP RFC 9457 problem details",
+  "type": "object",
+  "required": ["type", "title", "status", "code"],
+  "properties": {
+    "type": { "$ref": "common.schema.json#/$defs/uri" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "status": { "type": "integer", "minimum": 400, "maximum": 599 },
+    "detail": { "type": "string", "maxLength": 10000 },
+    "instance": { "$ref": "common.schema.json#/$defs/uri" },
+    "code": {
+      "type": "string",
+      "pattern": "^AKEP_[A-Z0-9_]+$"
+    },
+    "traceId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "context-pack-request.schema.json",
+  "title": "AKEP v0.1 ContextPack extension request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task", "purpose", "supportedObligations"],
+  "properties": {
+    "akepVersion": { "const": "0.1" },
+    "task": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32000
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text"],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32000
+            },
+            "locale": {
+              "type": "string",
+              "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
+            }
+          }
+        }
+      ]
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
+    },
+    "mode": {
+      "enum": ["lexical", "exact"],
+      "default": "lexical"
+    },
+    "spaces": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uri" }
+    },
+    "filters": { "$ref": "query.schema.json#/properties/filters" },
+    "purpose": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._:-]{0,127}$"
+    },
+    "supportedObligations": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/obligation" }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxCharacters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128000,
+          "default": 12000
+        },
+        "maxPassages": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 12
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64000
+        }
+      }
+    },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  }
+}

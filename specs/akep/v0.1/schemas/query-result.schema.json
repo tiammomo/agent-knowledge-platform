@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query-result.schema.json",
+  "title": "AKEP v0.1 query result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "queryReceiptId",
+    "policyEpoch",
+    "snapshot",
+    "indexedThrough",
+    "projectionGeneration",
+    "results",
+    "critical"
+  ],
+  "properties": {
+    "queryReceiptId": {
+      "$ref": "common.schema.json#/$defs/uri"
+    },
+    "policyEpoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "snapshot": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    },
+    "nextCursor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    },
+    "indexedThrough": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "projectionGeneration": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "results": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/result" }
+    },
+    "extensions": {
+      "$ref": "common.schema.json#/$defs/extensions"
+    },
+    "critical": {
+      "$ref": "common.schema.json#/$defs/critical"
+    }
+  },
+  "$defs": {
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "profile", "value"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "profile": { "$ref": "common.schema.json#/$defs/uri" },
+        "value": { "type": "number" },
+        "metric": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "backend": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "locator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "start", "end"],
+          "properties": {
+            "type": { "const": "text-offset" },
+            "start": { "type": "integer", "minimum": 0 },
+            "end": { "type": "integer", "minimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "pointer"],
+          "properties": {
+            "type": { "const": "json-pointer" },
+            "pointer": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "page"],
+          "properties": {
+            "type": { "const": "page" },
+            "page": { "type": "integer", "minimum": 1 },
+            "bbox": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "whole-resource" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "start", "end"],
+          "properties": {
+            "type": { "const": "byte-range" },
+            "start": { "type": "integer", "minimum": 0 },
+            "end": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Exclusive byte offset in the complete representation."
+            }
+          }
+        }
+      ]
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["citationId", "payloadDigest", "locator"],
+      "properties": {
+        "citationId": { "$ref": "common.schema.json#/$defs/uri" },
+        "payloadDigest": { "$ref": "common.schema.json#/$defs/digest" },
+        "locator": { "$ref": "#/$defs/locator" },
+        "quote": {
+          "type": "string",
+          "maxLength": 32000
+        },
+        "chunkId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recordId",
+        "spaceId",
+        "revisionId",
+        "profile",
+        "assetType",
+        "title",
+        "scores",
+        "citations",
+        "qualityDecision",
+        "qualityReasons",
+        "qualityAttestationRefs",
+        "effectiveDecision",
+        "obligations"
+      ],
+      "properties": {
+        "recordId": { "$ref": "common.schema.json#/$defs/uri" },
+        "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+        "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" },
+        "profile": { "$ref": "common.schema.json#/$defs/schemaRef" },
+        "assetType": {
+          "enum": [
+            "source_document",
+            "assertion",
+            "observation",
+            "procedure",
+            "policy",
+            "example",
+            "failure_case",
+            "hypothesis",
+            "dataset",
+            "prompt",
+            "capability_manifest"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "scores": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/score" }
+        },
+        "citations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/citation" }
+        },
+        "relations": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "common.schema.json#/$defs/relation" }
+        },
+        "provenance": { "$ref": "common.schema.json#/$defs/provenance" },
+        "attestations": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/uri" }
+        },
+        "statuses": {
+          "type": "array",
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["deprecated"]
+          }
+        },
+        "qualityDecision": {
+          "enum": ["suitable", "suitable_with_warning"]
+        },
+        "qualityReasons": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "qualityAttestationRefs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/uri" }
+        },
+        "effectiveDecision": {
+          "enum": ["allowed", "allowed_with_obligations"]
+        },
+        "obligations": {
+          "type": "array",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": { "$ref": "common.schema.json#/$defs/obligation" }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "effectiveDecision": { "const": "allowed" }
+            },
+            "required": ["effectiveDecision"]
+          },
+          "then": {
+            "properties": {
+              "obligations": { "type": "array", "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effectiveDecision": { "const": "allowed_with_obligations" }
+            },
+            "required": ["effectiveDecision"]
+          },
+          "then": {
+            "properties": {
+              "obligations": { "type": "array", "minItems": 1 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

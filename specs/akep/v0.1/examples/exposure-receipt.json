@@ -1,0 +1,34 @@
+{
+  "exposureReceiptId": "urn:uuid:0198a1d2-82d5-7b43-8d2d-6af93e78c011",
+  "kind": "blob_read",
+  "subjectPseudonym": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "spaceIds": [
+    "https://knowledge.example/spaces/support"
+  ],
+  "purpose": "customer-support",
+  "policyDecisionId": "urn:uuid:0198a1d2-82d5-7b43-8d2d-6af93e78c012",
+  "policyEpoch": "support-policy-42",
+  "obligations": ["cite", "no-train"],
+  "citations": [
+    {
+      "citationId": "urn:uuid:0198a1d2-82d5-7b43-8d2d-6af93e78c002",
+      "spaceId": "https://knowledge.example/spaces/support",
+      "revisionId": "urn:akep:sha256:645b377464b2d9886f2567066e7d932156b2435df8fcc8d0790e5720129e430d",
+      "payloadDigest": "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+      "locator": {
+        "type": "whole-resource"
+      },
+      "qualityDecision": "suitable_with_warning",
+      "qualityReasons": [
+        "Supervisor review is required for requests older than 30 days."
+      ],
+      "qualityAttestationRefs": [
+        "https://knowledge.example/attestations/review-0198"
+      ]
+    }
+  ],
+  "issuedAt": "2026-07-15T02:01:00Z",
+  "expiresAt": "2026-07-15T02:06:00Z",
+  "extensions": {},
+  "critical": []
+}

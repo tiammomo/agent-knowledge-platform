@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contribution-receipt.schema.json",
+  "title": "AKEP v0.1 contribution receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contributionId",
+    "spaceId",
+    "kind",
+    "subjectRevisionId",
+    "status",
+    "policyEpoch",
+    "statusUrl",
+    "createdAt"
+  ],
+  "properties": {
+    "contributionId": { "$ref": "common.schema.json#/$defs/uri" },
+    "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+    "kind": {
+      "enum": ["create", "revise", "deprecate", "revoke", "erase"]
+    },
+    "subjectRevisionId": {
+      "$ref": "common.schema.json#/$defs/revisionId"
+    },
+    "status": {
+      "enum": [
+        "candidate",
+        "validating",
+        "needs_evidence",
+        "verified",
+        "accepted",
+        "rejected",
+        "quarantined",
+        "withdrawn"
+      ]
+    },
+    "submittedRevisionId": {
+      "$ref": "common.schema.json#/$defs/revisionId"
+    },
+    "policyEpoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "statusUrl": { "$ref": "common.schema.json#/$defs/uri" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "decisionRefs": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uri" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": { "enum": ["create", "revise"] }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "required": ["submittedRevisionId"],
+        "properties": {
+          "submittedRevisionId": {}
+        }
+      }
+    }
+  ]
+}

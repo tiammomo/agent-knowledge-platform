@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evaluation-run.schema.json",
+  "title": "AKEP v0.1 immutable EvaluationRun",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evaluationRunVersion",
+    "runId",
+    "clientRunId",
+    "spaceId",
+    "subject",
+    "startedAt",
+    "completedAt",
+    "status",
+    "dataset",
+    "evaluator",
+    "metrics",
+    "thresholds",
+    "gate",
+    "evidenceRefs",
+    "attestationId",
+    "critical"
+  ],
+  "properties": {
+    "evaluationRunVersion": { "const": "0.1" },
+    "runId": { "$ref": "common.schema.json#/$defs/uri" },
+    "clientRunId": { "$ref": "common.schema.json#/$defs/uri" },
+    "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revisionId"],
+      "properties": {
+        "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" }
+      }
+    },
+    "startedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "completedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "status": { "const": "completed" },
+    "dataset": { "$ref": "common.schema.json#/$defs/schemaRef" },
+    "evaluator": { "$ref": "common.schema.json#/$defs/schemaRef" },
+    "metrics": { "$ref": "evaluation-run-request.schema.json#/$defs/metrics" },
+    "thresholds": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 100,
+      "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$" },
+      "additionalProperties": { "$ref": "evaluation-run-request.schema.json#/$defs/threshold" }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checks", "outcome", "reasons"],
+      "properties": {
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/check" }
+        },
+        "outcome": { "enum": ["pass", "warning", "fail"] },
+        "reasons": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "type": "string", "minLength": 1, "maxLength": 5000 }
+        }
+      }
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "maxItems": 1000,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uri" }
+    },
+    "attestationId": { "$ref": "common.schema.json#/$defs/uri" },
+    "critical": { "type": "array", "maxItems": 0 }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "actual", "operator", "threshold", "required", "passed"],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "actual": { "type": "number" },
+        "operator": { "enum": ["gte", "lte"] },
+        "threshold": { "type": "number" },
+        "required": { "type": "boolean" },
+        "passed": { "type": "boolean" }
+      }
+    }
+  }
+}

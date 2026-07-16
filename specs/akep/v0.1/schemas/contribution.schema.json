@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contribution.schema.json",
+  "title": "AKEP v0.1 contribution request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "akepVersion",
+    "spaceId",
+    "kind",
+    "clientSubmissionId",
+    "rationale",
+    "evidenceRefs",
+    "critical"
+  ],
+  "properties": {
+    "akepVersion": { "const": "0.1" },
+    "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+    "kind": {
+      "enum": ["create", "revise", "deprecate", "revoke", "erase"]
+    },
+    "clientSubmissionId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "revisionId": {
+      "$ref": "common.schema.json#/$defs/revisionId"
+    },
+    "manifest": {
+      "$ref": "asset-manifest.schema.json"
+    },
+    "baseRevisionIds": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "common.schema.json#/$defs/revisionId"
+      }
+    },
+    "targetRevisionId": {
+      "$ref": "common.schema.json#/$defs/revisionId"
+    },
+    "inlinePayloads": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "digest", "encoding", "data"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "digest": { "$ref": "common.schema.json#/$defs/digest" },
+          "encoding": { "const": "base64" },
+          "data": {
+            "type": "string",
+            "contentEncoding": "base64"
+          }
+        }
+      }
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20000
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "maxItems": 1000,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uri" }
+    },
+    "generationReceiptRef": {
+      "$ref": "common.schema.json#/$defs/uri"
+    },
+    "extensions": {
+      "$ref": "common.schema.json#/$defs/extensions"
+    },
+    "critical": {
+      "$ref": "common.schema.json#/$defs/critical"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": { "enum": ["create", "revise"] }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "required": ["revisionId", "manifest"],
+        "properties": {
+          "revisionId": {},
+          "manifest": {}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": { "const": "create" }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "properties": {
+          "baseRevisionIds": false,
+          "targetRevisionId": false,
+          "manifest": {
+            "type": "object",
+            "properties": {
+              "parents": {
+                "type": "array",
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": { "const": "revise" }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "required": ["baseRevisionIds"],
+        "properties": {
+          "targetRevisionId": false,
+          "baseRevisionIds": {
+            "type": "array",
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": { "enum": ["deprecate", "revoke", "erase"] }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "required": ["targetRevisionId"],
+        "properties": {
+          "targetRevisionId": {},
+          "revisionId": false,
+          "manifest": false,
+          "baseRevisionIds": false,
+          "inlinePayloads": false
+        }
+      }
+    }
+  ]
+}

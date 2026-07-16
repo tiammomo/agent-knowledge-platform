@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ingestion-receipt.schema.json",
+  "title": "AKEP v0.1 ingestion receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ingestionId", "status", "statusUrl", "createdAt"],
+  "properties": {
+    "ingestionId": { "$ref": "common.schema.json#/$defs/uri" },
+    "status": {
+      "enum": ["received", "scanning", "parsing", "candidate", "failed"]
+    },
+    "statusUrl": { "$ref": "common.schema.json#/$defs/uri" },
+    "contentDigest": { "$ref": "common.schema.json#/$defs/digest" },
+    "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" },
+    "contributionId": { "$ref": "common.schema.json#/$defs/uri" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "problemRef": { "$ref": "common.schema.json#/$defs/uri" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "candidate" } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["revisionId", "contributionId"],
+        "properties": {
+          "revisionId": {},
+          "contributionId": {},
+          "problemRef": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "failed" } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["problemRef"],
+        "properties": {
+          "revisionId": false,
+          "contributionId": false,
+          "problemRef": {}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "enum": ["received", "scanning", "parsing"] }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "revisionId": false,
+          "contributionId": false,
+          "problemRef": false
+        }
+      }
+    }
+  ]
+}

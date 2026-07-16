@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contribution-withdrawal.schema.json",
+  "title": "AKEP v0.1 contribution withdrawal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["akepVersion", "withdrawalId", "reason", "critical"],
+  "properties": {
+    "akepVersion": { "const": "0.1" },
+    "withdrawalId": { "$ref": "common.schema.json#/$defs/uri" },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 10000 },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  }
+}

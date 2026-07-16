@@ -1,0 +1,63 @@
+{
+  "queryReceiptId": "urn:uuid:0198a1d2-82d5-7b43-8d2d-6af93e78c010",
+  "policyEpoch": "support-policy-42",
+  "snapshot": "opaque:ZXhhbXBsZS1zbmFwc2hvdA",
+  "indexedThrough": "2026-07-15T01:59:58Z",
+  "projectionGeneration": "embed-multilingual-v4/chunker-3",
+  "results": [
+    {
+      "recordId": "https://knowledge.example/assets/refund-policy",
+      "spaceId": "https://knowledge.example/spaces/support",
+      "revisionId": "urn:akep:sha256:645b377464b2d9886f2567066e7d932156b2435df8fcc8d0790e5720129e430d",
+      "profile": {
+        "uri": "https://agentknowledge.dev/profiles/procedure/1",
+        "digest": "sha256:aae83aa5cd8d97cba553b453544d89e97609c6d91a57109b3ed5ee4897e648b4"
+      },
+      "assetType": "procedure",
+      "title": "退款处理流程",
+      "summary": "直营网店超过 30 天退款申请的复核流程。",
+      "scores": [
+        {
+          "method": "hybrid-rerank",
+          "profile": "https://knowledge.example/rankers/support-v3",
+          "value": 0.81,
+          "metric": "server-local",
+          "backend": "hybrid"
+        }
+      ],
+      "citations": [
+        {
+          "citationId": "urn:uuid:0198a1d2-82d5-7b43-8d2d-6af93e78c002",
+          "payloadDigest": "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+          "locator": {
+            "type": "text-offset",
+            "start": 120,
+            "end": 248
+          },
+          "quote": "超过 30 天的申请需由值班主管复核。",
+          "chunkId": "chunk-17"
+        }
+      ],
+      "relations": [
+        {
+          "type": "supersedes",
+          "target": "urn:akep:sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ],
+      "attestations": [
+        "https://knowledge.example/attestations/review-0198"
+      ],
+      "qualityDecision": "suitable_with_warning",
+      "qualityReasons": [
+        "Procedure is approved for support use but requires supervisor review after 30 days."
+      ],
+      "qualityAttestationRefs": [
+        "https://knowledge.example/attestations/review-0198"
+      ],
+      "effectiveDecision": "allowed_with_obligations",
+      "obligations": ["cite", "no-train"]
+    }
+  ],
+  "extensions": {},
+  "critical": []
+}

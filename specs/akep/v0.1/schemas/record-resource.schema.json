@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "record-resource.schema.json",
+  "title": "AKEP v0.1 record resolution resource",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spaceId", "recordId", "policyEpoch", "heads", "channels", "statuses", "resolvedAt"],
+  "properties": {
+    "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+    "recordId": { "$ref": "common.schema.json#/$defs/uri" },
+    "policyEpoch": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "heads": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/revisionId" }
+    },
+    "channels": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["trustDomain", "name", "revisionId", "updatedAt", "eventId"],
+        "properties": {
+          "trustDomain": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "name": {
+            "enum": ["candidate", "verified", "published"]
+          },
+          "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" },
+          "updatedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+          "eventId": { "$ref": "common.schema.json#/$defs/uri" }
+        }
+      }
+    },
+    "statuses": {
+      "type": "array",
+      "maxItems": 1000,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trustDomain",
+          "revisionId",
+          "name",
+          "assertedAt",
+          "eventId"
+        ],
+        "properties": {
+          "trustDomain": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" },
+          "name": {
+            "enum": ["deprecated", "revoked", "quarantined", "erased"]
+          },
+          "assertedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+          "eventId": { "$ref": "common.schema.json#/$defs/uri" },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      }
+    },
+    "resolvedAt": { "$ref": "common.schema.json#/$defs/timestamp" }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "protocol": "akep",
+  "versions": ["0.1"],
+  "node": {
+    "id": "https://knowledge.example",
+    "name": "Example Knowledge Node",
+    "trustDomain": "knowledge.example"
+  },
+  "baseUrl": "https://knowledge.example/akep/0.1",
+  "profiles": ["reader", "contributor", "curator", "publisher"],
+  "operations": ["query", "resolve", "fetch", "receipt", "contribute", "amend", "withdraw", "usage", "feedback", "decide", "publish", "deprecate", "revoke", "erase"],
+  "auth": {
+    "protectedResourceMetadata": "https://knowledge.example/.well-known/oauth-protected-resource"
+  },
+  "limits": {
+    "maxPageSize": 100,
+    "maxPayloadBytes": 10485760,
+    "idempotencyWindowSeconds": 86400
+  },
+  "schemas": {
+    "attestation": "https://knowledge.example/schemas/akep/0.1/attestation.schema.json",
+    "context-pack": "https://knowledge.example/schemas/akep/0.1/context-pack.schema.json",
+    "context-pack-request": "https://knowledge.example/schemas/akep/0.1/context-pack-request.schema.json",
+    "contribution": "https://knowledge.example/schemas/akep/0.1/contribution.schema.json",
+    "evaluation-run": "https://knowledge.example/schemas/akep/0.1/evaluation-run.schema.json",
+    "evaluation-run-request": "https://knowledge.example/schemas/akep/0.1/evaluation-run-request.schema.json",
+    "feedback": "https://knowledge.example/schemas/akep/0.1/feedback.schema.json",
+    "manifest": "https://knowledge.example/schemas/akep/0.1/asset-manifest.schema.json",
+    "query": "https://knowledge.example/schemas/akep/0.1/query.schema.json",
+    "usage": "https://knowledge.example/schemas/akep/0.1/usage.schema.json"
+  },
+  "supportedExtensions": [
+    {
+      "uri": "https://knowledge.example/extensions/akep/context-pack/0.1",
+      "required": false
+    },
+    {
+      "uri": "https://knowledge.example/extensions/mcp-adapter/0.1",
+      "required": false
+    }
+  ],
+  "extensions": {},
+  "critical": [],
+  "expiresAt": "2026-07-16T00:00:00Z"
+}

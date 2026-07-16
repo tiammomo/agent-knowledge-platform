@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "capability.schema.json",
+  "title": "AKEP v0.1 capability document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "versions",
+    "node",
+    "baseUrl",
+    "profiles",
+    "operations",
+    "limits",
+    "schemas",
+    "supportedExtensions",
+    "critical",
+    "expiresAt"
+  ],
+  "properties": {
+    "protocol": { "const": "akep" },
+    "versions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9]+\\.[0-9]+$"
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "$ref": "common.schema.json#/$defs/uri" },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "trustDomain": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
+      }
+    },
+    "baseUrl": { "$ref": "common.schema.json#/$defs/uri" },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["reader", "contributor", "curator", "publisher", "federation"]
+      }
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "query",
+          "resolve",
+          "fetch",
+          "receipt",
+          "ingest",
+          "contribute",
+          "amend",
+          "withdraw",
+          "usage",
+          "feedback",
+          "decide",
+          "publish",
+          "deprecate",
+          "revoke",
+          "erase",
+          "changes",
+          "snapshot",
+          "ack"
+        ]
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protectedResourceMetadata": {
+          "$ref": "common.schema.json#/$defs/uri"
+        },
+        "mtls": { "type": "boolean" },
+        "dpop": { "type": "boolean" }
+      }
+    },
+    "federation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "snapshot": { "type": "boolean" },
+        "cursor": { "type": "boolean" },
+        "merkle": { "type": "boolean" },
+        "proofSuites": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "keySetUri": { "$ref": "common.schema.json#/$defs/httpsUri" }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxPageSize", "maxPayloadBytes", "idempotencyWindowSeconds"],
+      "properties": {
+        "maxPageSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "maxPayloadBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxBatchBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "idempotencyWindowSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "schemas": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+      },
+      "additionalProperties": {
+        "$ref": "common.schema.json#/$defs/uri"
+      }
+    },
+    "supportedExtensions": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["uri", "required"],
+        "properties": {
+          "uri": { "$ref": "common.schema.json#/$defs/uri" },
+          "required": { "type": "boolean" }
+        }
+      }
+    },
+    "extensions": {
+      "$ref": "common.schema.json#/$defs/extensions"
+    },
+    "critical": {
+      "$ref": "common.schema.json#/$defs/critical"
+    },
+    "expiresAt": { "$ref": "common.schema.json#/$defs/timestamp" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "profiles": { "type": "array", "contains": { "const": "reader" } } },
+        "required": ["profiles"]
+      },
+      "then": {
+        "properties": {
+          "operations": {
+            "type": "array",
+            "allOf": [
+              { "contains": { "const": "query" } },
+              { "contains": { "const": "resolve" } },
+              { "contains": { "const": "fetch" } },
+              { "contains": { "const": "receipt" } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "profiles": { "type": "array", "contains": { "const": "contributor" } } },
+        "required": ["profiles"]
+      },
+      "then": {
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "contains": { "const": "reader" }
+          },
+          "operations": {
+            "type": "array",
+            "allOf": [
+              { "contains": { "const": "contribute" } },
+              { "contains": { "const": "amend" } },
+              { "contains": { "const": "withdraw" } },
+              { "contains": { "const": "usage" } },
+              { "contains": { "const": "feedback" } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "profiles": { "type": "array", "contains": { "const": "curator" } } },
+        "required": ["profiles"]
+      },
+      "then": {
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "contains": { "const": "contributor" }
+          },
+          "operations": { "type": "array", "contains": { "const": "decide" } }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "profiles": { "type": "array", "contains": { "const": "publisher" } } },
+        "required": ["profiles"]
+      },
+      "then": {
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "contains": { "const": "curator" }
+          },
+          "operations": {
+            "type": "array",
+            "allOf": [
+              { "contains": { "const": "publish" } },
+              { "contains": { "const": "deprecate" } },
+              { "contains": { "const": "revoke" } },
+              { "contains": { "const": "erase" } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "contains": { "const": "federation" }
+          }
+        },
+        "required": ["profiles"]
+      },
+      "then": {
+        "required": ["federation"],
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "contains": { "const": "reader" }
+          },
+          "node": {
+            "type": "object",
+            "required": ["trustDomain"],
+            "properties": { "trustDomain": {} }
+          },
+          "operations": {
+            "type": "array",
+            "allOf": [
+              { "contains": { "const": "snapshot" } },
+              { "contains": { "const": "changes" } },
+              { "contains": { "const": "ack" } }
+            ]
+          },
+          "federation": {
+            "type": "object",
+            "required": ["snapshot", "cursor", "proofSuites", "keySetUri"],
+            "properties": {
+              "snapshot": { "const": true },
+              "cursor": { "const": true },
+              "keySetUri": {},
+              "proofSuites": {
+                "type": "array",
+                "contains": { "const": "dsse-jcs-ed25519" }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

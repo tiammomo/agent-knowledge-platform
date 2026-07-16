@@ -1,0 +1,50 @@
+{
+  "profileVersion": "0.1",
+  "profileId": "https://agentknowledge.dev/profiles/procedure/1",
+  "assetType": "procedure",
+  "primaryPayload": {
+    "mediaTypes": ["text/markdown; charset=utf-8"],
+    "languages": ["zh-CN"]
+  },
+  "requiredManifestFields": [
+    "/scope",
+    "/scope/reviewAfter",
+    "/provenance",
+    "/policy"
+  ],
+  "scopeRequirements": ["/scope/reviewAfter"],
+  "allowedRelations": [
+    "supports",
+    "contradicts",
+    "supersedes",
+    "refines",
+    "derived_from",
+    "applies_under",
+    "invalidates"
+  ],
+  "validationRules": [
+    { "ruleId": "media-type-allowlist", "ruleVersion": "1" },
+    { "ruleId": "utf8-well-formed", "ruleVersion": "1" },
+    { "ruleId": "markdown-structure", "ruleVersion": "1" },
+    { "ruleId": "source-link-check", "ruleVersion": "1" },
+    { "ruleId": "policy-completeness", "ruleVersion": "1" },
+    { "ruleId": "scope-completeness", "ruleVersion": "1" }
+  ],
+  "requiredAttestations": [
+    "schema-validation",
+    "provenance-validation",
+    "human-review",
+    "safety-scan",
+    "license-review",
+    "policy-approval"
+  ],
+  "riskClass": "R2",
+  "reviewPolicy": {
+    "minimumIndependentReviewers": 1,
+    "reviewAfterRequired": true,
+    "revalidateOn": ["profile-change", "policy-change", "source-change", "attestation-expiry"]
+  },
+  "automaticPublicationAllowed": false,
+  "extensions": {},
+  "critical": []
+}

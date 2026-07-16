@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ingestion.schema.json",
+  "title": "AKEP v0.1 raw ingestion metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "akepVersion",
+    "spaceId",
+    "clientSubmissionId",
+    "title",
+    "assetType",
+    "policy",
+    "rationale",
+    "critical"
+  ],
+  "properties": {
+    "akepVersion": { "const": "0.1" },
+    "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+    "clientSubmissionId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "recordId": { "$ref": "common.schema.json#/$defs/uri" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "assetType": { "enum": ["source_document", "dataset"] },
+    "profile": { "$ref": "common.schema.json#/$defs/schemaRef" },
+    "sourceUri": { "$ref": "common.schema.json#/$defs/uri" },
+    "locale": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$"
+    },
+    "policy": { "$ref": "common.schema.json#/$defs/policy" },
+    "rationale": { "type": "string", "minLength": 1, "maxLength": 20000 },
+    "expectedDigest": { "$ref": "common.schema.json#/$defs/digest" },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "policy-binding.schema.json",
+  "title": "AKEP v0.1 local effective policy binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bindingVersion",
+    "bindingId",
+    "spaceId",
+    "recordId",
+    "policy",
+    "declaredBy",
+    "issuedAt",
+    "state",
+    "policyEpoch",
+    "critical"
+  ],
+  "properties": {
+    "bindingVersion": { "const": "0.1" },
+    "bindingId": { "$ref": "common.schema.json#/$defs/uri" },
+    "spaceId": { "$ref": "common.schema.json#/$defs/uri" },
+    "recordId": { "$ref": "common.schema.json#/$defs/uri" },
+    "revisionId": { "$ref": "common.schema.json#/$defs/revisionId" },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "payloadName": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "chunkId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "policy": { "$ref": "common.schema.json#/$defs/schemaRef" },
+    "declaredBy": { "$ref": "common.schema.json#/$defs/uri" },
+    "issuedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "effectiveFrom": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "expiresAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "state": { "enum": ["active", "revoked"] },
+    "supersedes": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uri" }
+    },
+    "visibilityPartition": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "policyEpoch": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "change-page.schema.json",
+  "title": "AKEP v0.1 federation change page",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deliveryId", "cursor", "checkpoint", "eventSetDigest", "acceptedFilter", "events", "critical"],
+  "properties": {
+    "deliveryId": { "$ref": "common.schema.json#/$defs/uri" },
+    "cursor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    },
+    "checkpoint": { "$ref": "signed-checkpoint.schema.json" },
+    "eventSetDigest": { "$ref": "common.schema.json#/$defs/digest" },
+    "acceptedFilter": { "$ref": "snapshot-request.schema.json" },
+    "events": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "dsse-event-envelope.schema.json" }
+    },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  }
+}

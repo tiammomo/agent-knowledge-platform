@@ -1,0 +1,34 @@
+[project]
+name = "akep-knowledge-worker"
+version = "0.1.0"
+description = "Isolated validation worker for the Agent Knowledge Exchange Protocol"
+requires-python = ">=3.13,<3.15"
+dependencies = [
+  "jsonschema[format]>=4.25,<5",
+  "referencing>=0.36,<1",
+  "rfc8785>=0.1.4,<1",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4,<10",
+  "ruff>=0.12,<1",
+]
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/akep_worker"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

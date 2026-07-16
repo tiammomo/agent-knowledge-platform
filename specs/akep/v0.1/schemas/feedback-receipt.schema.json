@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "feedback-receipt.schema.json",
+  "title": "AKEP v0.1 server-issued feedback evidence receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "feedbackId",
+    "evidenceId",
+    "usageId",
+    "status",
+    "subjectPseudonym",
+    "evaluatorVersion",
+    "correlationClass",
+    "policyEpoch",
+    "receivedAt",
+    "eligibleForAggregation",
+    "critical"
+  ],
+  "properties": {
+    "feedbackId": { "$ref": "common.schema.json#/$defs/uri" },
+    "evidenceId": { "$ref": "common.schema.json#/$defs/uri" },
+    "usageId": { "$ref": "common.schema.json#/$defs/uri" },
+    "status": { "enum": ["recorded", "quarantined"] },
+    "subjectPseudonym": { "$ref": "common.schema.json#/$defs/digest" },
+    "evaluatorVersion": { "$ref": "common.schema.json#/$defs/schemaRef" },
+    "correlationClass": {
+      "enum": ["self_author", "same_organization", "related_source", "independent", "unknown"]
+    },
+    "policyEpoch": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "receivedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "eligibleForAggregation": { "type": "boolean" },
+    "extensions": { "$ref": "common.schema.json#/$defs/extensions" },
+    "critical": { "$ref": "common.schema.json#/$defs/critical" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "quarantined" }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "eligibleForAggregation": { "const": false }
+        }
+      }
+    }
+  ]
+}

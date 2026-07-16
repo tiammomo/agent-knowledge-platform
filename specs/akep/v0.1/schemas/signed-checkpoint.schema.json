@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "signed-checkpoint.schema.json",
+  "title": "AKEP v0.1 DSSE signed federation checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["payloadType", "payload", "signatures"],
+  "properties": {
+    "payloadType": { "const": "application/vnd.akep.checkpoint+json" },
+    "payload": {
+      "description": "Base64 of JCS bytes that validate against checkpoint.schema.json.",
+      "type": "string",
+      "contentEncoding": "base64"
+    },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["keyid", "sig"],
+        "properties": {
+          "keyid": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "sig": { "type": "string", "contentEncoding": "base64" }
+        }
+      }
+    }
+  }
+}
