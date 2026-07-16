@@ -1,0 +1,11 @@
+# Default ownership
+* @tiammomo
+
+# Security, protocol and persistence boundaries require explicit review.
+/.github/ @tiammomo
+/infra/ @tiammomo
+/specs/ @tiammomo
+/contracts/ @tiammomo
+/apps/core/src/platform/ @tiammomo
+/apps/core/src/modules/growth/ @tiammomo
+/apps/core/src/modules/query/ @tiammomo

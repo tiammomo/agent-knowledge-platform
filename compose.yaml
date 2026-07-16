@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: pgvector/pgvector:0.8.2-pg17-bookworm
+    image: pgvector/pgvector:0.8.5-pg17-bookworm@sha256:d2ef61f42ef767baa5a1475393303cc235bcd92febd9d7014eddb48b41f3bad0
     environment:
       POSTGRES_DB: akep
       POSTGRES_USER: akep

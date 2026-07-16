@@ -1,7 +1,7 @@
 {
   "name": "agent-knowledge-platform",
   "private": true,
-  "packageManager": "pnpm@11.13.0",
+  "packageManager": "pnpm@11.13.1",
   "engines": {
     "node": ">=24 <25"
   },
@@ -13,7 +13,7 @@
     "dev": "pnpm --filter @akep/core dev",
     "dev:web": "pnpm --filter @akep/web dev",
     "docs:check": "node scripts/check-docs.mjs",
-    "test:integration": "TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgres://akep:akep-local-only@localhost:5432/akep} pnpm --filter @akep/core test",
+    "test:integration": "node scripts/run-integration.mjs",
     "start": "pnpm --filter @akep/core start",
     "smoke:web": "pnpm --filter @akep/web smoke",
     "sdk:check": "pnpm --filter @akep/sdk typecheck && pnpm --filter @akep/mcp-server typecheck && PYTHONPATH=packages/sdk-python python -m unittest discover -s packages/sdk-python/tests",

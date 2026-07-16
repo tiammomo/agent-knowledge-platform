@@ -1,4 +1,4 @@
-FROM node:24.16.0-bookworm-slim AS build
+FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS build
 WORKDIR /workspace
 RUN corepack enable
 
@@ -10,20 +10,21 @@ COPY apps/core apps/core
 COPY infra/postgres/migrations infra/postgres/migrations
 COPY specs specs
 RUN pnpm --filter @akep/core build
+# Core has no workspace runtime dependencies. Legacy deploy keeps the repository's
+# normal workspace linking mode unchanged while producing a production-only tree.
+RUN pnpm --filter @akep/core deploy --legacy --prod /opt/akep-core
 
-FROM node:24.16.0-bookworm-slim AS runtime
-ENV NODE_ENV=development
-WORKDIR /workspace
-RUN corepack enable
+FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runtime
+ENV NODE_ENV=production
+WORKDIR /opt/akep-core
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+      /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
-COPY --from=build /workspace/package.json /workspace/pnpm-workspace.yaml /workspace/pnpm-lock.yaml ./
-COPY --from=build /workspace/node_modules node_modules
-COPY --from=build /workspace/apps/core/package.json apps/core/package.json
-COPY --from=build /workspace/apps/core/node_modules apps/core/node_modules
-COPY --from=build /workspace/apps/core/dist apps/core/dist
-COPY --from=build /workspace/infra/postgres/migrations infra/postgres/migrations
-COPY --from=build /workspace/specs specs
+COPY --from=build --chown=node:node /opt/akep-core ./
+COPY --from=build --chown=node:node /workspace/infra/postgres/migrations ./infra/postgres/migrations
+COPY --from=build --chown=node:node /workspace/specs ./specs
 
 USER node
 EXPOSE 3000
-CMD ["node", "apps/core/dist/entrypoint.js"]
+CMD ["node", "dist/entrypoint.js"]

@@ -10,7 +10,7 @@
 > 当前版本尚未完成多租户、公网生产、监管级擦除或大规模语义检索验收。
 
 [快速开始](#快速开始) · [当前能力](#当前能力) · [接入维护与隔离](#接入维护与隔离) ·
-[文档](#文档) · [生产边界](#生产边界)
+[文档](#文档) · [协作与安全](#协作与安全) · [生产边界](#生产边界)
 
 ## 为什么不只是 RAG
 
@@ -128,6 +128,16 @@ AKEP_WEB_ORIGIN=http://localhost:8080 pnpm smoke:web
 
 `pnpm check` 覆盖 Core/Web 测试、40 个公开 Schema、8 个协议样例、2 个 Profile、JCS 黄金向量、
 Markdown 本地链接/锚点、TypeScript/Python SDK、MCP 类型、Worker Ruff 和 Pytest。
+
+## 协作与安全
+
+Pull Request 会执行类型、测试、契约、文档、构建和 PostgreSQL 集成验证；独立安全工作流执行
+生产依赖审计、Secret 扫描、生产镜像构建和 High/Critical 漏洞门禁。GitHub Actions、Docker、
+Compose 与 uv 依赖由 Dependabot 定期检查。
+
+- 贡献约定与本地验证：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 私密漏洞报告与生产基线：[SECURITY.md](SECURITY.md)
+- 当前实现与上线门禁：[实现状态](docs/architecture/implementation-status.md)
 
 ## Agent 接入
 

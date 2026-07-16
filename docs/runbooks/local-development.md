@@ -8,7 +8,7 @@
 
 - Node.js 24、Corepack、pnpm 11。
 - Python 3.13 或 3.14、uv。
-- Docker Compose（用于 PostgreSQL 17 + pgvector 0.8.2）。
+- Docker Compose（用于 PostgreSQL 17 + pgvector 0.8.5）。
 
 只运行容器化 Web/Core/PostgreSQL 时，宿主机只需要 Docker Compose。执行 `pnpm check` 或
 在宿主机启动服务时才需要 Node.js、pnpm、Python 与 uv。

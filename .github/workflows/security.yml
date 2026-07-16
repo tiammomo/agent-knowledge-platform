@@ -1,0 +1,82 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependencies:
+    name: Dependencies and secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.13.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org
+
+      - name: Scan repository secrets
+        run: >-
+          docker run --rm
+          -v "${{ github.workspace }}:/workspace"
+          -w /workspace
+          aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+          fs --scanners secret --exit-code 1 .
+
+  images:
+    name: Production images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Build Core image
+        run: docker build --pull --file infra/docker/core.Dockerfile --tag akep-core:ci .
+
+      - name: Build Web image
+        run: docker build --pull --file infra/docker/web.Dockerfile --tag akep-web:ci .
+
+      - name: Scan Core image
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          -v trivy-cache:/root/.cache/trivy
+          aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+          image --scanners vuln --severity HIGH,CRITICAL
+          --ignore-unfixed --exit-code 1 akep-core:ci
+
+      - name: Scan Web image
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          -v trivy-cache:/root/.cache/trivy
+          aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+          image --scanners vuln --severity HIGH,CRITICAL
+          --ignore-unfixed --exit-code 1 akep-web:ci

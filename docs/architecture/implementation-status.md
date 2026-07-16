@@ -34,6 +34,7 @@
 | Web Console | 可运行 | React 19 + TypeScript + Vite；八个响应式产品页面，全部读取真实 API 状态 |
 | 新手引导 | 可运行 | 五步可恢复向导，真实执行 discovery → candidate → review → publish → query |
 | Console Read Model | 可运行 | 私有 no-store 总览、资产、贡献、效果证据和服务健康投影；Reviewer 可读取候选正文和证据 |
+| 持续交付基线 | 可运行 | GitHub CI 执行全量检查、构建与 PostgreSQL 集成测试；安全工作流执行生产依赖、Secret 和 High/Critical 生产镜像漏洞门禁；关键边界由 CODEOWNERS 评审 |
 
 紧急撤销会立即从检索和精确读取中移除 Revision，并使尚未过期的旧 Exposure Receipt
 失效。Feedback 永远先作为证据写入，当前不会直接改变内容、发布状态或排名。
