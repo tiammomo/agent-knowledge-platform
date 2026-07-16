@@ -595,23 +595,28 @@ export class PostgresGrowthStore implements GrowthStore {
   ): Promise<CreateResult<ContributionState>> {
     const result = await this.pool.query(
       `insert into contribution.workflow
-         (contribution_id, subject_digest, idempotency_key, request_digest,
+         (tenant_id, contribution_id, subject_digest, idempotency_key, request_digest,
           client_submission_id, space_id, kind, subject_revision_id, status,
           workflow_version, request_document, payloads, receipt_document,
           review_decision, amendments, created_at, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,
-               $14::jsonb,$15::jsonb,$16,$17)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,
+               $15::jsonb,$16::jsonb,$17,$18)
        on conflict do nothing
        returning contribution_id`,
-      contributionParameters(state),
+      contributionParameters(this.config.tenantId, state),
     );
     if (result.rowCount === 1) return { created: true, value: state };
     const existing = await this.pool.query(
       `select * from contribution.workflow
-        where subject_digest = $1
-          and (idempotency_key = $2 or client_submission_id = $3)
-        order by (idempotency_key = $2) desc limit 1`,
-      [state.subjectDigest, state.idempotencyKey, state.request.clientSubmissionId],
+        where tenant_id = $1 and subject_digest = $2
+          and (idempotency_key = $3 or client_submission_id = $4)
+        order by (idempotency_key = $3) desc limit 1`,
+      [
+        this.config.tenantId,
+        state.subjectDigest,
+        state.idempotencyKey,
+        state.request.clientSubmissionId,
+      ],
     );
     return { created: false, value: contributionFromRow(existing.rows[0]) };
   }
@@ -620,8 +625,9 @@ export class PostgresGrowthStore implements GrowthStore {
     contributionId: string,
   ): Promise<ContributionState | undefined> {
     const result = await this.pool.query(
-      "select * from contribution.workflow where contribution_id = $1",
-      [contributionId],
+      `select * from contribution.workflow
+        where tenant_id = $1 and contribution_id = $2`,
+      [this.config.tenantId, contributionId],
     );
     return result.rows[0] === undefined
       ? undefined
@@ -646,7 +652,7 @@ export class PostgresGrowthStore implements GrowthStore {
             set status = $3, workflow_version = $4, receipt_document = $5::jsonb,
                 review_decision = $6::jsonb, amendments = $7::jsonb,
                 payloads = $8::jsonb, updated_at = $9
-          where contribution_id = $1 and workflow_version = $2`,
+          where contribution_id = $1 and workflow_version = $2 and tenant_id = $10`,
         [
           contributionId,
           expectedVersion,
@@ -657,6 +663,7 @@ export class PostgresGrowthStore implements GrowthStore {
           JSON.stringify(next.amendments),
           JSON.stringify(next.payloads),
           next.updatedAt,
+          this.config.tenantId,
         ],
       );
       if (result.rowCount !== 1) return { kind: "precondition_failed" };
@@ -679,7 +686,12 @@ export class PostgresGrowthStore implements GrowthStore {
         mutation,
       );
       if (existing.kind !== "miss") return mutationResult(existing);
-      if (!(await lockWorkflow(client, contributionId, expectedVersion))) {
+      if (!(await lockWorkflow(
+        client,
+        this.config.tenantId,
+        contributionId,
+        expectedVersion,
+      ))) {
         return { kind: "precondition_failed" };
       }
       const manifest = asset.manifest;
@@ -750,7 +762,7 @@ export class PostgresGrowthStore implements GrowthStore {
             and status = 'published'`,
         [this.config.tenantId, asset.spaceId, manifest.recordId],
       );
-      await insertLifecycleEvent(client, asset.publicationEvent);
+      await insertLifecycleEvent(client, this.config.tenantId, asset.publicationEvent);
       await client.query(
         `insert into governance.channel
            (tenant_id, space_id, record_id, trust_domain, channel_name,
@@ -796,8 +808,14 @@ export class PostgresGrowthStore implements GrowthStore {
           asset.indexedAt,
         ],
       );
-      await updateLockedWorkflow(client, contributionId, next);
-      await insertOutbox(client, "governance", "akep.channel.updated", asset.publicationEvent);
+      await updateLockedWorkflow(client, this.config.tenantId, contributionId, next);
+      await insertOutbox(
+        client,
+        this.config.tenantId,
+        "governance",
+        "akep.channel.updated",
+        asset.publicationEvent,
+      );
       await insertWorkflowMutation(client, this.config.tenantId, mutation);
       return { kind: "applied", record: mutation };
     });
@@ -818,7 +836,12 @@ export class PostgresGrowthStore implements GrowthStore {
         mutation,
       );
       if (existing.kind !== "miss") return mutationResult(existing);
-      if (!(await lockWorkflow(client, contributionId, expectedVersion))) {
+      if (!(await lockWorkflow(
+        client,
+        this.config.tenantId,
+        contributionId,
+        expectedVersion,
+      ))) {
         return { kind: "precondition_failed" };
       }
       const status = event.status;
@@ -843,7 +866,7 @@ export class PostgresGrowthStore implements GrowthStore {
       ) {
         return { kind: "precondition_failed" };
       }
-      await insertLifecycleEvent(client, event);
+      await insertLifecycleEvent(client, this.config.tenantId, event);
       await client.query(
         `insert into governance.revision_status
            (tenant_id, space_id, revision_id, trust_domain, status_name,
@@ -874,24 +897,26 @@ export class PostgresGrowthStore implements GrowthStore {
       if (status === "erased") {
         const erasedUsage = await client.query<{ readonly usage_id: string }>(
           `select usage_id from query.usage_receipt
-            where request_document->>'spaceId' = $1
+            where tenant_id = $1 and request_document->>'spaceId' = $2
               and exists (
                 select 1
                   from jsonb_array_elements(request_document->'citations') citation
-                 where citation->>'revisionId' = $2
+                 where citation->>'revisionId' = $3
               )
             for update`,
-          [event.spaceId, targetRevisionId],
+          [this.config.tenantId, event.spaceId, targetRevisionId],
         );
         const erasedUsageIds = erasedUsage.rows.map((row) => row.usage_id);
         if (erasedUsageIds.length > 0) {
           await client.query(
-            `delete from evaluation.feedback_evidence where usage_id = any($1::text[])`,
-            [erasedUsageIds],
+            `delete from evaluation.feedback_evidence
+              where tenant_id = $1 and usage_id = any($2::text[])`,
+            [this.config.tenantId, erasedUsageIds],
           );
           await client.query(
-            `delete from query.usage_receipt where usage_id = any($1::text[])`,
-            [erasedUsageIds],
+            `delete from query.usage_receipt
+              where tenant_id = $1 and usage_id = any($2::text[])`,
+            [this.config.tenantId, erasedUsageIds],
           );
         }
         await client.query(
@@ -901,12 +926,13 @@ export class PostgresGrowthStore implements GrowthStore {
         );
         await client.query(
           `delete from query.exposure_receipt
-            where exists (
+            where tenant_id = $1
+              and exists (
               select 1
                 from jsonb_array_elements(document->'citations') citation
-               where citation->>'spaceId' = $1 and citation->>'revisionId' = $2
+               where citation->>'spaceId' = $2 and citation->>'revisionId' = $3
             )`,
-          [event.spaceId, targetRevisionId],
+          [this.config.tenantId, event.spaceId, targetRevisionId],
         );
         await client.query(
           `delete from catalog.revision_blob
@@ -925,12 +951,18 @@ export class PostgresGrowthStore implements GrowthStore {
         );
         await client.query(
           `update contribution.workflow set payloads = '[]'::jsonb
-            where contribution_id = $1`,
-          [sourceContributionId],
+            where tenant_id = $1 and contribution_id = $2`,
+          [this.config.tenantId, sourceContributionId],
         );
       }
-      await updateLockedWorkflow(client, contributionId, next);
-      await insertOutbox(client, "governance", `akep.status.${status}`, event);
+      await updateLockedWorkflow(client, this.config.tenantId, contributionId, next);
+      await insertOutbox(
+        client,
+        this.config.tenantId,
+        "governance",
+        `akep.status.${status}`,
+        event,
+      );
       await insertWorkflowMutation(client, this.config.tenantId, mutation);
       return { kind: "applied", record: mutation };
     });
@@ -941,11 +973,13 @@ export class PostgresGrowthStore implements GrowthStore {
       `select p.*, e.document as publication_document,
               s.document as status_document
          from query.knowledge_projection p
-         join governance.lifecycle_event e on e.event_id = p.publication_event_id
+         join governance.lifecycle_event e
+           on e.tenant_id = p.tenant_id and e.event_id = p.publication_event_id
          left join lateral (
            select le.document
              from governance.revision_status rs
-             join governance.lifecycle_event le on le.event_id = rs.event_id
+             join governance.lifecycle_event le
+               on le.tenant_id = rs.tenant_id and le.event_id = rs.event_id
             where rs.tenant_id = p.tenant_id and rs.space_id = p.space_id
               and rs.revision_id = p.revision_id
             order by rs.asserted_at desc limit 1
@@ -958,7 +992,9 @@ export class PostgresGrowthStore implements GrowthStore {
 
   public async listContributions(): Promise<readonly ContributionState[]> {
     const result = await this.pool.query(
-      "select * from contribution.workflow order by updated_at desc",
+      `select * from contribution.workflow
+        where tenant_id = $1 order by updated_at desc`,
+      [this.config.tenantId],
     );
     return result.rows.map(contributionFromRow);
   }
@@ -972,16 +1008,27 @@ export class PostgresGrowthStore implements GrowthStore {
       readonly usage: number;
     }>(
       `select
-         (select count(*)::integer from evaluation.feedback_evidence) as feedback,
-         (select count(*)::integer from query.usage_receipt) as usage`,
+         (select count(*)::integer from evaluation.feedback_evidence
+           where tenant_id = $1) as feedback,
+         (select count(*)::integer from query.usage_receipt
+           where tenant_id = $1) as usage`,
+      [this.config.tenantId],
     );
     return result.rows[0] ?? { feedback: 0, usage: 0 };
   }
 
   public async evidenceSummary(): Promise<EvidenceSummary> {
     const [usage, feedback] = await Promise.all([
-      this.pool.query("select * from query.usage_receipt order by created_at desc"),
-      this.pool.query("select * from evaluation.feedback_evidence order by received_at desc"),
+      this.pool.query(
+        `select * from query.usage_receipt
+          where tenant_id = $1 order by created_at desc`,
+        [this.config.tenantId],
+      ),
+      this.pool.query(
+        `select * from evaluation.feedback_evidence
+          where tenant_id = $1 order by received_at desc`,
+        [this.config.tenantId],
+      ),
     ]);
     return summarizeEvidence(
       usage.rows.map(usageFromRow),
@@ -997,11 +1044,13 @@ export class PostgresGrowthStore implements GrowthStore {
       `select p.*, e.document as publication_document,
               s.document as status_document
          from query.knowledge_projection p
-         join governance.lifecycle_event e on e.event_id = p.publication_event_id
+         join governance.lifecycle_event e
+           on e.tenant_id = p.tenant_id and e.event_id = p.publication_event_id
          left join lateral (
            select le.document
              from governance.revision_status rs
-             join governance.lifecycle_event le on le.event_id = rs.event_id
+             join governance.lifecycle_event le
+               on le.tenant_id = rs.tenant_id and le.event_id = rs.event_id
             where rs.tenant_id = p.tenant_id and rs.space_id = p.space_id
               and rs.revision_id = p.revision_id
             order by rs.asserted_at desc limit 1
@@ -1015,29 +1064,35 @@ export class PostgresGrowthStore implements GrowthStore {
   public async createUsage(state: UsageState): Promise<CreateResult<UsageState>> {
     const result = await this.pool.query(
       `insert into query.usage_receipt
-         (usage_id, subject_digest, idempotency_key, request_digest,
+         (tenant_id, usage_id, subject_digest, idempotency_key, request_digest,
           client_usage_id, exposure_receipt_id, feedback_until,
           request_document, receipt_document, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11)
        on conflict do nothing
        returning usage_id`,
-      usageParameters(state),
+      usageParameters(this.config.tenantId, state),
     );
     if (result.rowCount === 1) return { created: true, value: state };
     const existing = await this.pool.query(
       `select * from query.usage_receipt
-        where subject_digest = $1
-          and (idempotency_key = $2 or client_usage_id = $3)
-        order by (idempotency_key = $2) desc limit 1`,
-      [state.subjectDigest, state.idempotencyKey, state.clientUsageId],
+        where tenant_id = $1 and subject_digest = $2
+          and (idempotency_key = $3 or client_usage_id = $4)
+        order by (idempotency_key = $3) desc limit 1`,
+      [
+        this.config.tenantId,
+        state.subjectDigest,
+        state.idempotencyKey,
+        state.clientUsageId,
+      ],
     );
     return { created: false, value: usageFromRow(existing.rows[0]) };
   }
 
   public async getUsage(usageId: string): Promise<UsageState | undefined> {
     const result = await this.pool.query(
-      "select * from query.usage_receipt where usage_id = $1",
-      [usageId],
+      `select * from query.usage_receipt
+        where tenant_id = $1 and usage_id = $2`,
+      [this.config.tenantId, usageId],
     );
     return result.rows[0] === undefined ? undefined : usageFromRow(result.rows[0]);
   }
@@ -1071,12 +1126,13 @@ export class PostgresGrowthStore implements GrowthStore {
   ): Promise<CreateResult<FeedbackState>> {
     const result = await this.pool.query(
       `insert into evaluation.feedback_evidence
-         (feedback_id, subject_digest, idempotency_key, request_digest, usage_id,
+         (tenant_id, feedback_id, subject_digest, idempotency_key, request_digest, usage_id,
           request_document, receipt_document, received_at)
-       values ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8)
+       values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9)
        on conflict do nothing
        returning feedback_id`,
       [
+        this.config.tenantId,
         state.feedbackId,
         state.subjectDigest,
         state.idempotencyKey,
@@ -1090,13 +1146,19 @@ export class PostgresGrowthStore implements GrowthStore {
     if (result.rowCount === 1) return { created: true, value: state };
     const existing = await this.pool.query(
       `select * from evaluation.feedback_evidence
-        where subject_digest = $1
-          and (idempotency_key = $2 or feedback_id = $3 or usage_id = $4)
-        order by (idempotency_key = $2) desc,
-                 (feedback_id = $3) desc,
-                 (usage_id = $4) desc
+        where tenant_id = $1 and subject_digest = $2
+          and (idempotency_key = $3 or feedback_id = $4 or usage_id = $5)
+        order by (idempotency_key = $3) desc,
+                 (feedback_id = $4) desc,
+                 (usage_id = $5) desc
         limit 1`,
-      [state.subjectDigest, state.idempotencyKey, state.feedbackId, state.usageId],
+      [
+        this.config.tenantId,
+        state.subjectDigest,
+        state.idempotencyKey,
+        state.feedbackId,
+        state.usageId,
+      ],
     );
     return { created: false, value: feedbackFromRow(existing.rows[0]) };
   }
@@ -1328,8 +1390,9 @@ function searchContent(asset: PublishedAsset): string {
     .join("\n");
 }
 
-function contributionParameters(state: ContributionState): unknown[] {
+function contributionParameters(tenantId: string, state: ContributionState): unknown[] {
   return [
+    tenantId,
     state.receipt.contributionId,
     state.subjectDigest,
     state.idempotencyKey,
@@ -1387,8 +1450,9 @@ function publishedFromRow(row: Record<string, unknown>): PublishedAsset {
   };
 }
 
-function usageParameters(state: UsageState): unknown[] {
+function usageParameters(tenantId: string, state: UsageState): unknown[] {
   return [
+    tenantId,
     state.usageId,
     state.subjectDigest,
     state.idempotencyKey,
@@ -1577,19 +1641,21 @@ function stringValue(value: unknown, fallback: string): string {
 
 async function lockWorkflow(
   client: PoolClient,
+  tenantId: string,
   contributionId: string,
   expectedVersion: number,
 ): Promise<boolean> {
   const result = await client.query<{ readonly workflow_version: number }>(
     `select workflow_version from contribution.workflow
-      where contribution_id = $1 for update`,
-    [contributionId],
+      where tenant_id = $1 and contribution_id = $2 for update`,
+    [tenantId, contributionId],
   );
   return result.rows[0]?.workflow_version === expectedVersion;
 }
 
 async function updateLockedWorkflow(
   client: PoolClient,
+  tenantId: string,
   contributionId: string,
   next: ContributionState,
 ): Promise<void> {
@@ -1598,7 +1664,7 @@ async function updateLockedWorkflow(
         set status = $2, workflow_version = $3, receipt_document = $4::jsonb,
             review_decision = $5::jsonb, amendments = $6::jsonb,
             payloads = $7::jsonb, updated_at = $8
-      where contribution_id = $1`,
+      where contribution_id = $1 and tenant_id = $9`,
     [
       contributionId,
       next.receipt.status,
@@ -1608,20 +1674,23 @@ async function updateLockedWorkflow(
       JSON.stringify(next.amendments),
       JSON.stringify(next.payloads),
       next.updatedAt,
+      tenantId,
     ],
   );
 }
 
 async function insertLifecycleEvent(
   client: PoolClient,
+  tenantId: string,
   event: LifecycleEvent,
 ): Promise<void> {
   await client.query(
     `insert into governance.lifecycle_event
-       (event_id, event_type, space_id, record_id, revision_id,
+       (tenant_id, event_id, event_type, space_id, record_id, revision_id,
         policy_epoch, document, occurred_at)
-     values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+     values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)`,
     [
+      tenantId,
       event.eventId,
       event.eventType,
       event.spaceId,
@@ -1636,14 +1705,15 @@ async function insertLifecycleEvent(
 
 async function insertOutbox(
   client: PoolClient,
+  tenantId: string,
   owner: string,
   eventType: string,
   event: LifecycleEvent,
 ): Promise<void> {
   await client.query(
     `insert into platform.outbox_event
-       (owner_module, event_type, aggregate_id, payload)
-     values ($1,$2,$3,$4::jsonb)`,
-    [owner, eventType, event.revisionId, JSON.stringify(event)],
+       (tenant_id, owner_module, event_type, aggregate_id, payload)
+     values ($1,$2,$3,$4,$5::jsonb)`,
+    [tenantId, owner, eventType, event.revisionId, JSON.stringify(event)],
   );
 }

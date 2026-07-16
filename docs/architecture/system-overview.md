@@ -26,8 +26,8 @@ flowchart LR
 
 默认 Compose 启动 Web、Core 和 PostgreSQL。MCP Adapter 是独立 stdio 进程；Python Worker
 提供可独立验证的规范化、切片和静态扫描能力，但当前不在默认 Compose 中，也没有数据库权限。
-生产 OIDC 和 OTLP 导出已经有实现基线，外部 PDP、对象存储、异步 Worker 调度与 Outbox relay
-仍未进入默认运行时。
+生产 OIDC、固定部署 Tenant 的 PostgreSQL RLS 和 OTLP 导出已经有实现基线；动态 Principal
+Tenant、外部 PDP、对象存储、异步 Worker 调度与 Outbox relay 仍未进入默认运行时。
 
 外部接入、持续维护和多团队隔离的目标架构分别见：
 
@@ -41,7 +41,7 @@ flowchart LR
 | --- | --- | --- |
 | Web Console | 展示真实 API 状态，驱动贡献、评测、审核、发布、检索和 Agent 接入 | 不作为授权或证明事实源 |
 | AKEP Core | HTTP、认证、契约校验、治理状态机、事务、查询和收据 | 不执行 LLM 推理，不把知识正文当指令 |
-| PostgreSQL | Revision/Lifecycle/Receipt/Outbox 的持久事实与可重建词法投影 | 不代表已经具备多租户 RLS 或大规模搜索 |
+| PostgreSQL | Revision/Lifecycle/Receipt/Outbox 的持久事实、可重建词法投影、17 张事实表 Tenant RLS | 固定部署 Tenant 不代表共享多租户、Space PDP 或大规模搜索已完成 |
 | Knowledge Worker | 无状态内容规范化、确定性切片、静态敏感内容扫描、摘要校验 | 不直接读写数据库，不批准发布 |
 | SDK | 封装版本头、错误、Query/ContextPack/读取及反馈闭环 | 不缓存第二套知识状态 |
 | MCP Adapter | 将受治理查询、读取、Usage/Feedback 和候选贡献映射为 MCP 工具 | 不持有审核、发布、撤销或擦除权限 |
@@ -108,6 +108,8 @@ Feedback 只形成证据，不能直接修改正文、排名规则或 Published 
 - PostgreSQL 保存不可变 Revision、生命周期事实、Contribution workflow、Attestation、
   EvaluationRun、Exposure/Usage/Feedback Receipt、Outbox 与查询投影。
 - 迁移文件的名称和 SHA-256 会被记录并在启动时核对；生产数据库缺失迁移或迁移被修改时拒绝就绪。
+- 17 张事实表以非空 Tenant、复合约束和 `ENABLE/FORCE RLS` 隔离；Core 专用连接池固定绑定部署
+  Tenant，owner 管理数据库登录角色 → Tenant 绑定，生产运行角色必须与 migration owner 分离。
 - Channel/Status 变化和 Outbox 在同一事务内提交；发布唯一性由数据库约束保护。
 - 当前 Payload 在 create/revise 同步路径中以内联 canonical base64 进入，单请求上限 10 MiB。
 - pgvector 扩展和表结构已经就位，但当前检索只启用 lexical/exact；没有生产语义嵌入流水线。
@@ -123,6 +125,8 @@ Feedback 只形成证据，不能直接修改正文、排名规则或 Published 
 3. Candidate 默认不可查询；贡献、审核、发布、事故响应和擦除职责分离。
 4. Revision 与 Citation 使用摘要固定；写操作使用幂等键，工作流修改使用 ETag/`If-Match`。
 5. 撤销和擦除先停止在线分发；当前试点回执不能冒充完整的监管级物理擦除证明。
+6. 数据库 Tenant 条件与 RLS 双层执行；缺失或伪造 Tenant 上下文默认拒绝，production readiness
+   校验角色绑定并拒绝 owner、superuser 与 `BYPASSRLS` 运行角色。
 
 ## 7. 运行形态
 
@@ -131,7 +135,7 @@ Feedback 只形成证据，不能直接修改正文、排名规则或 Published 
 | 内存测试 | 进程内 Store | 测试身份 | 快速单元/契约测试，不用于共享环境 |
 | 本地持久化 | PostgreSQL Compose | `dev-*` token | 开发、演示、完整成长闭环验证 |
 | 单租户隔离试点 | 外部持久 PostgreSQL | OIDC Remote JWKS | 受控网络、可回滚试点 |
-| 多租户/公网生产 | 尚未支持 | 尚未完成 | 需要 PDP、RLS、对象存储、安全扫描和完整运维验收 |
+| 多租户/公网生产 | 尚未支持 | 尚未完成 | 需要动态 Principal Tenant、PDP、全链路对象/缓存/队列隔离、安全扫描和完整运维验收 |
 
 ## 8. 有意关闭
 

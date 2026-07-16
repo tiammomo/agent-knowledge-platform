@@ -13,6 +13,7 @@ import type {
   ContributionState,
   PublishedAsset,
 } from "../src/modules/growth/types.js";
+import { createDatabase, type Database } from "../src/platform/database.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const integration = describe.skipIf(databaseUrl === undefined);
@@ -389,6 +390,138 @@ integration("PostgreSQL integration", () => {
       ).rejects.toThrow("AKEP revisions are immutable");
     } finally {
       await pool.end();
+    }
+  });
+
+  it("enforces tenant RLS and requires a restricted production role", async () => {
+    const config = loadConfig({ AUTH_MODE: "development", NODE_ENV: "test" }, import.meta.url);
+    const admin = new Pool({ connectionString: requireDatabaseUrl() });
+    const nonce = randomUUID().replaceAll("-", "");
+    const role = `akep_runtime_${nonce}`;
+    const password = `akep_${nonce}`;
+    const roleIdentifier = `"${role}"`;
+    const tenantA = `https://knowledge.test/tenants/rls-a-${nonce}`;
+    const tenantB = `https://knowledge.test/tenants/rls-b-${nonce}`;
+    const spaceId = "https://knowledge.test/spaces/rls";
+    const recordA = `urn:akep:asset:rls-a-${nonce}`;
+    const recordB = `urn:akep:asset:rls-b-${nonce}`;
+    const rejectedRecord = `urn:akep:asset:rls-rejected-${nonce}`;
+    const restrictedUrl = new URL(requireDatabaseUrl());
+    restrictedUrl.username = role;
+    restrictedUrl.password = password;
+    const migrationDirectory = join(
+      config.contractRoot,
+      "../../../infra/postgres/migrations",
+    );
+    let restrictedDatabase: Database | undefined;
+    let wrongTenantDatabase: Database | undefined;
+    let noContextPool: Pool | undefined;
+
+    try {
+      await admin.query(
+        `create role ${roleIdentifier}
+           login nosuperuser nocreatedb nocreaterole noinherit nobypassrls
+           password '${password}'`,
+      );
+      await admin.query(
+        `grant usage on schema catalog, contribution, evaluation, governance, platform, query
+             to ${roleIdentifier}`,
+      );
+      await admin.query(
+        `grant select, insert, update, delete on all tables in schema
+             catalog, contribution, evaluation, governance, query
+             to ${roleIdentifier}`,
+      );
+      await admin.query(
+        `grant select, insert, update, delete on platform.outbox_event
+             to ${roleIdentifier}`,
+      );
+      await admin.query(
+        `grant select on platform.schema_migration to ${roleIdentifier}`,
+      );
+      await admin.query(
+        `grant execute on function platform.current_tenant_id() to ${roleIdentifier}`,
+      );
+      await admin.query(
+        `insert into platform.tenant_runtime_role (database_role, tenant_id)
+         values ($1, $2)`,
+        [role, tenantA],
+      );
+      await admin.query(
+        `insert into catalog.record (tenant_id, space_id, record_id)
+         values ($1, $3, $4), ($2, $3, $5)`,
+        [tenantA, tenantB, spaceId, recordA, recordB],
+      );
+
+      const unsafeDatabase = createDatabase(
+        requireDatabaseUrl(),
+        migrationDirectory,
+        { requireRestrictedRole: true, tenantId: tenantA },
+      );
+      try {
+        expect(await unsafeDatabase.ready()).toBe(false);
+      } finally {
+        await unsafeDatabase.close();
+      }
+
+      restrictedDatabase = createDatabase(
+        restrictedUrl.toString(),
+        migrationDirectory,
+        { requireRestrictedRole: true, tenantId: tenantA },
+      );
+      expect(await restrictedDatabase.ready()).toBe(true);
+
+      const visible = await restrictedDatabase.pool.query<{ readonly record_id: string }>(
+        `select record_id from catalog.record
+          where record_id = any($1::text[])
+          order by record_id`,
+        [[recordA, recordB]],
+      );
+      expect(visible.rows).toEqual([{ record_id: recordA }]);
+      await expect(
+        restrictedDatabase.pool.query(
+          `insert into catalog.record (tenant_id, space_id, record_id)
+           values ($1, $2, $3)`,
+          [tenantB, spaceId, rejectedRecord],
+        ),
+      ).rejects.toMatchObject({ code: "42501" });
+
+      noContextPool = new Pool({ connectionString: restrictedUrl.toString() });
+      const hidden = await noContextPool.query<{ readonly count: string }>(
+        `select count(*)::text as count from catalog.record
+          where record_id = any($1::text[])`,
+        [[recordA, recordB]],
+      );
+      expect(hidden.rows[0]?.count).toBe("0");
+
+      wrongTenantDatabase = createDatabase(
+        restrictedUrl.toString(),
+        migrationDirectory,
+        { requireRestrictedRole: true, tenantId: tenantB },
+      );
+      expect(await wrongTenantDatabase.ready()).toBe(false);
+      const forged = await wrongTenantDatabase.pool.query<{ readonly count: string }>(
+        `select count(*)::text as count from catalog.record
+          where record_id = any($1::text[])`,
+        [[recordA, recordB]],
+      );
+      expect(forged.rows[0]?.count).toBe("0");
+    } finally {
+      if (noContextPool !== undefined) await noContextPool.end();
+      if (wrongTenantDatabase !== undefined) await wrongTenantDatabase.close();
+      if (restrictedDatabase !== undefined) await restrictedDatabase.close();
+      await admin.query(
+        `delete from catalog.record
+          where tenant_id = any($1::text[]) and record_id = any($2::text[])`,
+        [[tenantA, tenantB], [recordA, recordB, rejectedRecord]],
+      );
+      await admin.query(
+        "delete from platform.tenant_runtime_role where database_role = $1",
+        [role],
+      );
+      await admin.query(`drop owned by ${roleIdentifier}`);
+      await admin.query(`drop role ${roleIdentifier}`);
+      await admin.end();
     }
   });
 });

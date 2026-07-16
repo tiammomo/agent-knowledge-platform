@@ -3,18 +3,22 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { Pool } from "pg";
 import { loadConfig } from "../config.js";
+import { tenantSessionOptions } from "../platform/database.js";
 
 const config = loadConfig();
-if (config.databaseUrl === undefined) {
-  throw new Error("DATABASE_URL is required to run migrations");
+const connectionString = process.env.MIGRATION_DATABASE_URL?.trim() || config.databaseUrl;
+if (connectionString === undefined) {
+  throw new Error("MIGRATION_DATABASE_URL or DATABASE_URL is required to run migrations");
 }
 
 const pool = new Pool({
   application_name: "akep-migrator",
-  connectionString: config.databaseUrl,
+  connectionString,
   max: 1,
+  options: tenantSessionOptions(config.tenantId),
 });
 const client = await pool.connect();
+let migrationError: unknown;
 
 try {
   await client.query("select pg_advisory_lock(hashtext('akep-schema-migrations'))");
@@ -53,9 +57,21 @@ try {
     );
     process.stdout.write(`applied ${file}\n`);
   }
+} catch (error) {
+  migrationError = error;
+  try {
+    await client.query("rollback");
+  } catch {
+    // Preserve the migration error even if PostgreSQL cannot roll back the connection.
+  }
+  throw error;
 } finally {
   try {
-    await client.query("select pg_advisory_unlock(hashtext('akep-schema-migrations'))");
+    try {
+      await client.query("select pg_advisory_unlock(hashtext('akep-schema-migrations'))");
+    } catch (error) {
+      if (migrationError === undefined) throw error;
+    }
   } finally {
     client.release();
     await pool.end();

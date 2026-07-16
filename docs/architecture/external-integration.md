@@ -229,7 +229,8 @@ Contribution 来“修复”事故。
 
 1. **I0 当前快速路径**：Discovery + OIDC + REST/SDK/MCP，单租户、人工注册。
 2. **I1 Integration Registry**：Owner、client、Space、purpose、quota、状态和审计。
-3. **I2 租户上下文/RLS**：完成[多团队隔离设计](multi-team-isolation.md)后才允许共享运行时。
+3. **I2 动态租户上下文/PDP**：全表 Tenant/RLS 基线已完成；可信 Principal Tenant、事务级动态
+   上下文与全链路隔离完成后才允许共享运行时。
 4. **I3 Ingestion Runtime**：隔离对象区、扫描/解析沙箱、Connector checkpoint、Candidate。
 5. **I4 Outbox Relay**：CloudEvents、订阅、ACK/DLQ、撤销优先。
 6. **I5 自助接入**：审批模板、contract test、canary、轮换、停用和成本归属。

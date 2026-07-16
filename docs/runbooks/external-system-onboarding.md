@@ -9,8 +9,9 @@ Registry，OIDC client、Tenant/Space 映射、配额和审批仍需平台管理
 
 > [!WARNING]
 > 当前 Core 的 Tenant 由整个进程的 `AKEP_TENANT_ID` 固定，不支持按 client 映射多个 Tenant。
-> 一个试点实例只能承载一个受控 Tenant；多租户 Principal/RLS 验收完成前，不得把互不信任团队
-> 接到同一实例。下文的跨 Tenant 负向测试属于目标多租户门禁。
+> 数据库全表 Tenant RLS 已作为第二道防线，但一个试点实例仍只能承载一个受控 Tenant；可信
+> 多租户 Principal、动态事务上下文和全链路隔离验收完成前，不得把互不信任团队接到同一实例。
+> 下文的跨 Tenant HTTP/Space/侧信道测试仍属于目标多租户门禁。
 
 ## 1. 接入申请
 

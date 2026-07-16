@@ -48,17 +48,21 @@ export class InMemoryExposureReceiptStore implements ExposureReceiptStore {
 
 export class PostgresExposureReceiptStore implements ExposureReceiptStore {
   public readonly eraseIntegratedWithLifecycle = true;
-  public constructor(private readonly pool: Pool) {}
+  public constructor(
+    private readonly pool: Pool,
+    private readonly tenantId: string,
+  ) {}
 
   public async eraseRevision(spaceId: string, revisionId: string): Promise<void> {
     await this.pool.query(
       `delete from query.exposure_receipt
-        where exists (
+        where tenant_id = $1
+          and exists (
           select 1
             from jsonb_array_elements(document->'citations') citation
-           where citation->>'spaceId' = $1 and citation->>'revisionId' = $2
+           where citation->>'spaceId' = $2 and citation->>'revisionId' = $3
         )`,
-      [spaceId, revisionId],
+      [this.tenantId, spaceId, revisionId],
     );
   }
 
@@ -66,8 +70,8 @@ export class PostgresExposureReceiptStore implements ExposureReceiptStore {
     const result = await this.pool.query<{ readonly document: ExposureReceipt }>(
       `select document
          from query.exposure_receipt
-        where exposure_receipt_id = $1`,
-      [id],
+        where tenant_id = $1 and exposure_receipt_id = $2`,
+      [this.tenantId, id],
     );
     return result.rows[0]?.document;
   }
@@ -75,10 +79,11 @@ export class PostgresExposureReceiptStore implements ExposureReceiptStore {
   public async put(receipt: ExposureReceipt): Promise<void> {
     await this.pool.query(
       `insert into query.exposure_receipt
-         (exposure_receipt_id, subject_digest, policy_epoch, expires_at, document)
-       values ($1, $2, $3, $4, $5::jsonb)
-       on conflict (exposure_receipt_id) do nothing`,
+         (tenant_id, exposure_receipt_id, subject_digest, policy_epoch, expires_at, document)
+       values ($1, $2, $3, $4, $5, $6::jsonb)
+       on conflict (tenant_id, exposure_receipt_id) do nothing`,
       [
+        this.tenantId,
         receipt.exposureReceiptId,
         receipt.subjectPseudonym,
         receipt.policyEpoch,

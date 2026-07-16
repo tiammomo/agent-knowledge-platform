@@ -79,14 +79,18 @@ export async function buildApplication(
     (config.databaseUrl === undefined
       ? undefined
       : createDatabase(
-          config.databaseUrl,
-          resolve(config.contractRoot, "../../../infra/postgres/migrations"),
-        ));
+        config.databaseUrl,
+        resolve(config.contractRoot, "../../../infra/postgres/migrations"),
+        {
+          requireRestrictedRole: config.nodeEnv === "production",
+          tenantId: config.tenantId,
+        },
+      ));
   const receipts =
     options.receipts ??
     (database === undefined
       ? new InMemoryExposureReceiptStore()
-      : new PostgresExposureReceiptStore(database.pool));
+      : new PostgresExposureReceiptStore(database.pool, config.tenantId));
   const growth =
     options.growth ??
     (database === undefined
