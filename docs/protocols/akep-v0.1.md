@@ -1,9 +1,14 @@
 # AKEP v0.1：Agent Knowledge Exchange Protocol
 
 - 状态：Experimental Draft
-- 日期：2026-07-15
+- 最近核对：2026-07-16
 - 规范标识：`https://agentknowledge.dev/spec/akep/0.1`
 - 机器 Schema：[`specs/akep/v0.1`](../../specs/akep/v0.1/)
+
+> [!IMPORTANT]
+> 本文定义实验协议语义，不等于参考实现启用了所有操作。机器字段以
+> [OpenAPI/JSON Schema](../../specs/akep/v0.1/README.md)为准；当前运行能力见
+> [实现状态](../architecture/implementation-status.md)并以实例 Capability Discovery 为最终依据。
 
 ## 1. 摘要
 

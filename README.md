@@ -1,125 +1,71 @@
 # Agent Knowledge Platform
 
-面向 Agent 的知识与能力沉淀平台。目标不只是提供传统的检索增强生成（RAG），而是建立一套可持续演进的知识生态：Agent 能发现、学习和使用知识，也能将经过验证的新知识与能力贡献回平台。
+面向 Agent 的可验证知识与能力沉淀平台：让 Agent 不仅能检索知识，还能提交候选、绑定证据、
+参与评测，并在职责分离的治理流程后形成可追踪的新版本。
+
+**当前状态：** AKEP v0.1 实验参考实现 · 可本地运行 · 仅适合受控的单租户隔离试点
 
 > [!IMPORTANT]
-> 当前版本是可运行的 **AKEP v0.1 实验基线**，适合本地开发和受控的单租户隔离试点，尚不适合直接暴露到公网或用于多租户生产环境。AKEP（Agent Knowledge Exchange Protocol）是本项目的实验协议草案，并非已发布的公共标准。
+> AKEP（Agent Knowledge Exchange Protocol）是本项目的实验协议草案，不是已发布的公共标准。
+> 当前版本尚未完成多租户、公网生产、监管级擦除或大规模语义检索验收。
 
-## 导航
+[快速开始](#快速开始) · [当前能力](#当前能力) · [Agent 接入](#agent-接入) ·
+[文档](#文档) · [生产边界](#生产边界)
 
-- [核心闭环](#核心闭环) · [设计原则](#首要设计原则) · [系统组成](#系统组成)
-- [当前能力](#可运行的-phase-1-开发基线) · [快速开始](#快速开始) · [开发身份](#开发角色令牌)
-- [验证](#验证) · [Agent 接入](#agent-接入) · [项目结构](#项目结构) · [文档索引](#文档索引)
-- [生产边界](#生产边界) · [下一步](#下一步产品决策)
+## 为什么不只是 RAG
+
+传统 RAG 通常聚焦“切片、索引、召回”。本项目把知识消费前后的治理事实也纳入核心模型：
+
+- **来源可追溯**：保留作者、生成活动、原始来源、证据和策略。
+- **版本不可覆盖**：Manifest 内容寻址；修订产生新 Revision，历史引用可复现。
+- **候选与发布隔离**：Agent 贡献默认进入 Candidate，不能直接污染 Published Channel。
+- **权限贯穿全链路**：授权在召回、读取和上下文组装前执行，并考虑 Space、用途、策略和义务。
+- **质量不是单一分数**：Schema、安全扫描、评测、人工审核、时效和冲突分别形成 Attestation。
+- **效果形成证据**：Exposure → Usage → Feedback 可追踪，但反馈不能直接改正文或发布状态。
+- **数据与代码分离**：知识正文始终是不可信数据；可执行能力必须走独立制品供应链与沙箱。
 
 ## 核心闭环
 
-1. 人、系统或 Agent 上传原始知识与能力资产。
-2. 平台完成解析、结构化、去重、版本化和权限标注。
-3. Agent 按任务检索并使用合适的知识或能力。
-4. 平台记录引用关系、使用过程和效果反馈。
-5. Agent 将新发现、经验总结、失败教训或能力包作为候选贡献提交。
-6. 候选内容经过自动校验、评测、审核与可信度分级后发布。
-7. 新版本重新进入知识网络，形成可追踪的持续演进闭环。
-
-## 首要设计原则
-
-- **来源可追溯**：任何知识都要保留来源、作者、时间、证据和生成链路。
-- **版本不可覆盖**：知识修订产生新版本，支持比较、回滚、废弃和依赖分析。
-- **事实与经验分层**：区分事实、观点、流程、案例、记忆、提示词、工具和可执行能力。
-- **贡献不等于发布**：Agent 上传的内容默认进入候选区，不能直接污染正式知识库。
-- **效果可评估**：记录知识被谁、在什么任务中使用，以及是否真正改善结果。
-- **权限贯穿全链路**：采集、索引、检索、推理、分享和导出都必须遵守租户与访问控制。
-- **模型与存储可替换**：领域模型、检索引擎、向量库和大模型通过稳定接口解耦。
-
-## 核心领域
-
-- 知识资产：文档、片段、结构化事实、规则、案例、数据集和知识图谱。
-- 能力资产：提示词、Skill、Tool、工作流、Agent 配置、评测集和运行依赖。
-- 知识接入：上传、连接器、解析、切分、抽取、清洗、去重和索引。
-- 知识服务：搜索、语义检索、图谱查询、上下文组装、引用和 SDK/API。
-- 贡献系统：草稿、候选提交、证据绑定、差异比较、审核和合并。
-- 治理系统：身份、权限、密级、许可证、质量、可信度、生命周期和审计。
-- 演进系统：使用反馈、离线评测、冲突检测、知识衰减、晋级与淘汰。
-
-## 系统组成
-
 ```mermaid
 flowchart LR
-    S[人 / 系统 / Agent] --> C[候选贡献]
-    C --> W[解析、校验与安全扫描]
-    W --> E[评测与证明]
-    E --> R[Curator 独立审核]
-    R --> P[Publisher 发布]
+    S[Human / System / Agent] --> C[Candidate Contribution]
+    C --> V[Validate / Scan / Evaluate]
+    V --> R[Curator Review]
+    R --> P[Publisher Decision]
     P --> K[(Published Channel)]
-    K --> Q[Query / ContextPack / 精确读取]
+    K --> Q[Query / ContextPack / Fixed Read]
     Q --> A[Agent / SDK / MCP]
     A --> U[Exposure / Usage / Feedback]
     U --> C
 ```
 
-| 组件 | 职责 | 技术基线 |
-| --- | --- | --- |
-| `apps/core` | AKEP HTTP API、认证授权、契约校验、治理事务和查询 | Node.js 24、TypeScript、Fastify |
-| `apps/web` | 知识、贡献、审核、发布、评测和 Agent 接入控制台 | React 19、Vite |
-| `workers/knowledge-worker` | 规范化、确定性切片、Manifest/Revision 校验和静态安全扫描 | Python 3.13+ |
-| `infra/postgres` | 不可变 Revision、生命周期、收据、Outbox 和检索投影 | PostgreSQL 17、pgvector 0.8.2 |
-| `packages/sdk-*` | TypeScript / Python 客户端 | AKEP v0.1 |
-| `apps/mcp-server` | 面向 Agent 的 MCP stdio Adapter | MCP SDK、AKEP SDK |
-| `specs/akep/v0.1` | OpenAPI、JSON Schema、Profile 和一致性样例 | OpenAPI 3.1、JSON Schema 2020-12 |
+贡献成功不等于发布成功。Contributor、Evaluator、Curator、Publisher、Incident Responder 和
+Eraser 使用不同权限；高风险状态变化必须绑定固定 Revision、证据、策略版本、幂等键和 ETag。
 
-协议核心保持模块化单体，知识处理 Worker 与数据库权限隔离；MCP、SDK 和 Web Console 都通过同一套 AKEP 资源与治理边界接入。
+## 当前能力
 
-## Phase 1 验证范围
+| 能力面 | 当前实现 |
+| --- | --- |
+| 知识生命周期 | create/revise 候选、补证、撤回、独立审核、发布、废弃、撤销和试点 erase |
+| 版本与引用 | RFC 8785 JCS + SHA-256 Revision ID、不可变 Manifest、稳定 Citation、Range Blob |
+| 查询 | Published Channel lexical/exact Query、快照游标、预算化 ContextPack |
+| 质量门禁 | Profile Required Attestations、静态内容扫描、EvaluationRun、Curator/Publisher 证明 |
+| 效果证据 | 受主体、用途、策略、有效期和撤销约束的 Exposure → Usage → Feedback |
+| 协议 | AKEP v0.1、OpenAPI 3.1、40 个 JSON Schema、2 个 Phase 1 Profile 和一致性样例 |
+| Agent 接入 | TypeScript SDK、Python SDK、独立 MCP stdio Adapter |
+| Web Console | 总览、知识、贡献、审核、发布治理、效果证据、Agent 接入和设置；五步真实引导 |
+| 平台基线 | PostgreSQL 17 + pgvector、OIDC Remote JWKS、限流、安全头、OTLP trace、Prometheus/SLO |
+| Worker | 隔离的 Python JSONL Worker：规范化、切片、摘要校验和静态扫描；默认 Compose 不启动 |
 
-当前阶段聚焦最小但完整的受治理闭环：
-
-1. 支持文档上传、解析、版本管理和带引用的检索。
-2. 为 Agent 提供统一的搜索、读取和候选知识提交 API。
-3. 建立候选区与人工审核发布流程。
-4. 记录每次知识使用及其任务反馈。
-5. 用小规模评测集验证知识更新是否带来真实收益。
-
-## 文档索引
-
-- [总体技术方案 v0.1](docs/architecture/technical-design-v0.1.md)：架构不变量、领域模型、存储、安全、部署和路线图。
-- [AKEP v0.1 协议草案](docs/protocols/akep-v0.1.md)：知识身份、查询、贡献、反馈、事件、联邦及 MCP/A2A 适配。
-- [机器可读协议](specs/akep/v0.1/README.md)：OpenAPI 3.1、JSON Schema 2020-12、示例与 Revision 哈希测试向量。
-- [信任与发布治理](docs/governance/trust-and-publication.md)：质量信号、风险分级、发布门禁和紧急撤销。
-- 架构决策：[ADR-0001](docs/architecture/adr/0001-protocol-first-modular-monolith.md)、[ADR-0002](docs/architecture/adr/0002-content-addressed-revisions.md)。
-
-AKEP 是项目内的实验性工作名和 v0.1 草案，尚不是公共标准。首个实现应以契约测试和最小闭环验证其语义，再讨论稳定命名与外部标准化。
-
-## 可运行的 Phase 1 开发基线
-
-当前实现采用 **Node.js 24 + TypeScript** 作为协议核心，采用 **Python** 作为隔离的知识处理
-Worker。Node.js 负责 HTTP、认证、契约校验和事务边界；Python 负责 Manifest 校验、JCS
-摘要等无状态任务。PostgreSQL + pgvector 是规范元数据、收据与可重建检索投影的初始存储。
-
-已经具备：
-
-- 响应式 Web Console：总览、知识检索、贡献向导、独立审核、发布治理、效果证据、Agent 接入和平台设置。
-- 首次访问五步引导：真实完成能力发现、候选创建、Profile 证明链、角色分离审核/发布、带引用检索和 Agent 接入说明。
-- AKEP Reader、Contributor、Curator、Publisher 能力发现，40 个公开 Schema、健康检查和统一 Problem Details。
-- 相互隔离的开发角色令牌，以及版本、用途、义务、幂等键和工作流 ETag 校验。
-- 候选贡献、证据补充、撤回、独立审核、事务化发布、废弃、撤销和擦除动作。
-- Published Channel 上的词法/精确 Passage 检索、快照游标、预算化 ContextPack、不可变 Manifest 读取、完整/Range Blob 读取和稳定引用。
-- 不可变 EvaluationRun/Attestation 质量证据；发布逐项满足 Profile 的 `requiredAttestations`。Schema/安全证明来自服务端实际执行，审核与策略证明分别绑定 Curator/Publisher；benchmark 只接受真实 EvaluationRun，不再由前端伪造。
-- 受主体、用途、策略、有效期及撤销状态约束的 Exposure → Usage → Feedback 证据链。
-- TypeScript/Python SDK 与独立 MCP stdio Adapter；MCP 只适配 search/context/get/usage/feedback/candidate，不拥有治理权限。
-- OIDC Remote JWKS 生产认证、全局限流、安全响应头、Trace Context、可选 OTLP trace、Prometheus 指标与 SLO 健康视图。
-- TypeScript/Python 共用的 Manifest Schema 与跨语言 Revision ID 黄金向量。
-- PostgreSQL 不可变 Revision、生命周期事实、检索投影、Outbox、Receipt 和版本化迁移。
+当前只启用 `source_document` 与 `procedure` Profile，以及 lexical/exact 查询。Federation、
+A2A Adapter、外部 Ingestion Connector、semantic/hybrid Query、自动晋级和可执行能力包保持关闭。
+详见[实现状态与生产门禁](docs/architecture/implementation-status.md)。
 
 ## 快速开始
 
-### 环境要求
-
-- Docker 与 Docker Compose。
-- 宿主机开发需要 Node.js 24、Corepack 和 pnpm 11。
-- 执行完整校验还需要 Python 3.13 或 3.14 与 `uv`。
-
 ### 完整容器环境
+
+只需要 Docker 与 Docker Compose：
 
 ```bash
 git clone git@github.com:tiammomo/agent-knowledge-platform.git
@@ -127,9 +73,22 @@ cd agent-knowledge-platform
 docker compose --profile app up --build
 ```
 
-打开 `http://localhost:8080` 进入 Web Console，首次访问会自动启动五步引导。Web 入口会将 AKEP API 代理到 Core；Core 仍可通过 `http://localhost:3000` 直接访问。
+打开 `http://localhost:8080`。首次访问会启动五步引导，并通过真实 API 完成：
 
-如端口被占用，可显式指定宿主机端口：
+```text
+Discovery → Candidate → Attestations/Review → Publish → Cited Query
+```
+
+常用入口：
+
+| 地址 | 用途 |
+| --- | --- |
+| `http://localhost:8080` | Web Console 与统一 Web Origin |
+| `http://localhost:3000` | Core 直连调试 |
+| `http://localhost:3000/.well-known/akep` | Capability Discovery |
+| `http://localhost:3000/health/ready` | 就绪检查 |
+
+端口冲突时：
 
 ```bash
 AKEP_HOST_PORT=43117 AKEP_WEB_PORT=43118 docker compose --profile app up --build
@@ -137,7 +96,7 @@ AKEP_HOST_PORT=43117 AKEP_WEB_PORT=43118 docker compose --profile app up --build
 
 ### 宿主机开发
 
-本地启动数据库和核心服务：
+需要 Node.js 24、Corepack/pnpm 11、Python 3.13/3.14、uv 和 Docker Compose：
 
 ```bash
 corepack enable
@@ -148,98 +107,102 @@ pnpm db:migrate
 pnpm dev
 ```
 
-另开一个终端启动 Vite 开发服务器：
-
-```bash
-pnpm dev:web
-```
-
-浏览器打开 `http://localhost:5173`。开发服务器会代理本地 `3000` 端口的 Core API；所有引导动作都会调用真实 AKEP API，并写入 PostgreSQL。
-
-## 开发角色令牌
-
-以下令牌只允许用于非生产环境：
-
-| 令牌 | 角色 |
-| --- | --- |
-| `dev-reader` | 查询、读取、Usage、Feedback |
-| `dev-contributor` | 候选贡献、证据补充、撤回 |
-| `dev-evaluator` | 提交真实 EvaluationRun，不可审核/发布 |
-| `dev-curator` | 审核与验证，不可发布 |
-| `dev-publisher` | 发布与废弃，不可紧急撤销/擦除 |
-| `dev-incident` | 紧急撤销 |
-| `dev-eraser` | 隐私或法律擦除 |
-| `dev-console` | 本地全局 Console 只读投影 |
-| `dev-observer` | Prometheus 指标采集 |
+另开终端运行 `pnpm dev:web`，访问 `http://localhost:5173`。完整步骤、开发身份和排障见
+[本地开发运行手册](docs/runbooks/local-development.md)。
 
 ## 验证
 
-验证类型、单元测试、公开契约、SDK 和 Python Worker 基线：
-
 ```bash
+# 类型、单元测试、协议契约、SDK/MCP 与 Python Worker
 pnpm check
-```
 
-数据库运行时和完整成长闭环验证：
+# 全部生产构建
+pnpm build
 
-```bash
+# PostgreSQL 事务、迁移、不变量和完整成长闭环
 pnpm test:integration
-```
 
-对已经启动的统一 Web 入口执行完整 UI/API 烟雾闭环：
-
-```bash
+# 对已启动的统一 Web Origin 执行真实 UI/API 烟雾闭环（会写入随机示例）
 AKEP_WEB_ORIGIN=http://localhost:8080 pnpm smoke:web
 ```
 
-详细操作见[本地开发运行手册](docs/runbooks/local-development.md)，当前能力与生产缺口见[实现状态](docs/architecture/implementation-status.md)。
+`pnpm check` 覆盖 Core/Web 测试、40 个公开 Schema、8 个协议样例、2 个 Profile、JCS 黄金向量、
+Markdown 本地链接/锚点、TypeScript/Python SDK、MCP 类型、Worker Ruff 和 Pytest。
 
 ## Agent 接入
 
-Agent 接入可直接参考 [TypeScript SDK](packages/sdk-ts/README.md)、
-[Python SDK](packages/sdk-python/README.md) 与 [MCP Adapter](apps/mcp-server/README.md)。
-单租户隔离试点的 OIDC、数据库和观测配置见[生产试点运行手册](docs/runbooks/production-pilot.md)。
+Agent 应先读取 `/.well-known/akep`，再按实例声明的 Profile、Operation、Extension 和限制调用，
+不要仅凭 OpenAPI 推断运行能力。
 
-Web 信息架构、交互约束和新手引导验收见
-[Web Console 与新手引导](docs/product/web-console-and-onboarding.md)。
+- [TypeScript SDK](packages/sdk-ts/README.md)：Query、ContextPack、固定 Revision、
+  Usage/Feedback 和候选贡献。
+- [Python SDK](packages/sdk-python/README.md)：适合 Worker、评测作业和 Agent 服务的轻量客户端。
+- [MCP Adapter](apps/mcp-server/README.md)：`knowledge_search`、`knowledge_context`、
+  `knowledge_get`、Usage/Feedback 和候选提交；不暴露治理权限。
+- [HTTP API 快速参考](docs/reference/http-api.md)：Base URL、请求头、Scope、端点和 cURL。
+
+本地 `dev-*` token 只用于非生产角色演示。OIDC 模式下必须使用短期、audience-bound token，
+并通过签名 `akep_obligations` claim 发放调用方真正能够履行的义务。
 
 ## 项目结构
 
 ```text
 .
 ├── apps/
-│   ├── core/              # AKEP API 与治理核心
-│   ├── web/               # Web Console
-│   └── mcp-server/        # MCP stdio Adapter
+│   ├── core/              # AKEP HTTP、授权、治理、事务与查询
+│   ├── web/               # React Web Console
+│   └── mcp-server/        # 独立 MCP stdio Adapter
 ├── packages/
 │   ├── sdk-ts/            # TypeScript SDK
 │   └── sdk-python/        # Python SDK
 ├── workers/
-│   └── knowledge-worker/  # 隔离的 Python 知识处理 Worker
-├── specs/akep/v0.1/       # OpenAPI、Schema、Profile 与样例
-├── contracts/internal/    # Core 与 Worker 的内部任务契约
-├── infra/                 # Docker、PostgreSQL 迁移与校验脚本
-├── docs/                  # 架构、协议、治理、产品与运行手册
-└── compose.yaml           # 本地完整运行环境
+│   └── knowledge-worker/  # 无数据库权限的 Python Worker
+├── specs/akep/v0.1/       # OpenAPI、JSON Schema、Profile 和测试向量
+├── contracts/internal/    # Core / Worker 版本化任务契约
+├── infra/                 # Docker、PostgreSQL 迁移与验证脚本
+├── docs/                  # 架构、协议、治理、产品、API 与运行手册
+├── scripts/               # 文档完整性等仓库级检查
+└── compose.yaml           # 本地 Web/Core/PostgreSQL 环境
 ```
+
+## 文档
+
+完整阅读路径见[文档中心](docs/README.md)。
+
+| 主题 | 文档 |
+| --- | --- |
+| 当前组件与数据边界 | [系统概览](docs/architecture/system-overview.md) |
+| 当前完成度与生产缺口 | [实现状态](docs/architecture/implementation-status.md) |
+| 架构不变量与目标形态 | [技术方案 v0.1](docs/architecture/technical-design-v0.1.md) |
+| AKEP 规范语义 | [协议草案](docs/protocols/akep-v0.1.md) |
+| OpenAPI / Schema / Profile | [机器可读契约](specs/akep/v0.1/README.md) |
+| 信任与发布 | [治理基线](docs/governance/trust-and-publication.md) |
+| Web 产品与验收 | [Console 与新手引导](docs/product/web-console-and-onboarding.md) |
+| 试点部署 | [隔离生产试点运行手册](docs/runbooks/production-pilot.md) |
 
 ## 生产边界
 
-当前仓库已完成受治理知识成长闭环，以及 OIDC、基础可观测性、SDK/MCP 和评测门禁，但仍只适合受控的单租户隔离试点。扩大生产范围前必须补齐：
+当前实现可以作为受控单租户隔离试点的技术基线，但扩大部署前至少还要完成：
 
-- 外部 PDP、租户级 PostgreSQL RLS 与完整越权测试。
-- 加密对象存储、隔离上传区、独立恶意文件扫描和擦除证明。
-- 高可用观测、审计安全日志、备份恢复、密钥轮换与容量验收。
-- 语义/混合检索的授权下推、固定模型指纹和召回评测。
+1. 外部 PDP、租户上下文、PostgreSQL RLS 和完整越权测试。
+2. 加密对象存储、隔离上传、独立恶意文件扫描、解析沙箱和擦除证明。
+3. 高可用观测、审计安全日志、备份恢复、密钥轮换、迁移回滚和容量演练。
+4. 语义/混合检索的授权下推、模型指纹、召回评测和重建流程。
+5. 生产 Web 会话、短期 token 刷新、高权限二次确认与安全验收。
 
-应用在 `NODE_ENV=production` 下会拒绝开发认证启动，不能通过配置绕过。完整门禁见[实现状态](docs/architecture/implementation-status.md)和[生产试点运行手册](docs/runbooks/production-pilot.md)。
+`NODE_ENV=production` 会拒绝 development auth，不能通过配置绕过。上线前使用
+[试点 Go/No-Go 清单](docs/runbooks/production-pilot.md#0-go-no-go-检查)，不要把当前
+`dev-*` token、浏览器开发 bundle 或试点 erase 回执用于生产声明。
 
-## 下一步产品决策
+## 项目方向
 
-- 产品名称、首批用户和最优先的使用场景。
-- 单租户私有部署或多租户平台形态。
-- 首批知识类型，以及是否同时承载可执行 Agent 能力。
-- 生产身份源及 tenant/group claim 映射、外部 PDP、部署方式、数据安全等级和成本边界。
-- 自动发布的准入标准，以及人类审核在各知识等级中的职责。
+近期重点是用真实用户、真实知识和固定评测集验证：
 
-跨组织联邦、语义嵌入、可执行能力包及自动晋级仍保持关闭，直到相应的安全、质量和运维门禁完成。
+- 首个高价值场景与成功指标。
+- source document / procedure 之外的下一批 Profile。
+- lexical 基线达到什么条件后引入语义/混合检索。
+- 外部 PDP、对象存储与租户隔离的落地顺序。
+- 自动发布严格限定在哪些低风险、可机器验证的资产。
+
+项目与协议许可证、公共命名空间及 conformance 治理尚未最终确定；在这些决策完成前，不对外
+声称 AKEP 是公共标准或参考实现已达到通用生产合规。

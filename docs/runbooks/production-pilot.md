@@ -1,8 +1,30 @@
 # 隔离生产试点运行手册
 
+- 状态：受控单租户试点基线，不是通用生产认证
+- 最近核对：2026-07-16
+- 前置阅读：[实现状态与生产门禁](../architecture/implementation-status.md)
+
 当前仓库适合在单租户、受控网络、可回滚的试点环境中部署，不代表已经通过通用多租户或
 互联网生产验收。本手册只覆盖已经实现的 OIDC、PostgreSQL、限流、OpenTelemetry 导出与
 MCP 接入；外部 PDP、租户 RLS、对象存储和外部恶意文件扫描仍是扩大部署范围前的门禁。
+
+试点必须具备明确 Owner、受控网络边界、可停止写流量的入口、数据库备份和回滚窗口。若组织
+要求多租户隔离、公开互联网暴露、监管级擦除或高可用 SLO，本手册不足以授权上线。
+
+## 0. Go-No-Go 检查
+
+| 检查 | Go 条件 |
+| --- | --- |
+| 范围 | 单租户、明确 Space、受控用户和数据分类，未启用有意关闭能力 |
+| 身份 | 真实 IdP、短期 access token、最小 scope、职责分离、JWKS 轮换演练 |
+| 数据 | 已批准的数据集；10 MiB inline Payload 限制可接受；没有把试点 erase 当监管证明 |
+| 数据库 | 专用凭据、TLS/网络限制、备份与恢复演练、迁移摘要审计 |
+| 入口 | TLS 终止、请求体上限、可信代理链、限流与禁止绕过 Core 直连 |
+| 观测 | OTLP/Prometheus 外部落盘、告警接收人、日志脱敏和请求 ID 关联 |
+| 回滚 | 已验证上一制品、向前修复迁移方案、停止写入和撤销路径 |
+| 验收 | `pnpm check`、`pnpm build`、数据库 integration、权限矩阵和核心 smoke 通过 |
+
+任一项没有明确证据时保持 No-Go，或缩小到本地/非敏感演示。
 
 ## 1. 启动门禁
 
@@ -48,6 +70,9 @@ pnpm start
 就绪探针使用 `/health/ready`。Core 会把仓库内全部迁移名称和 SHA-256 与
 `platform.schema_migration` 精确比对，并检查关键索引、触发器和扩展；生产必须让
 `DATABASE_REQUIRED=true`，否则数据库不可用、迁移缺失或已应用文件被修改时不会通过启动门禁。
+
+容器镜像的 `entrypoint` 会先在 PostgreSQL advisory lock 下运行迁移，再启动服务；多副本仍应
+通过部署编排控制并发发布和就绪，不能用自动迁移替代备份、变更评审与兼容性验证。
 
 ## 2. 身份与最小权限
 
@@ -120,7 +145,45 @@ Usage/Feedback 或候选贡献时分别增加 `akep:feedback`、`akep:contribute
 evaluate、review、publish、incident 或 erase。其短期 access token 还必须携带与 Agent 实际
 执行能力一致的 `akep_obligations`；SDK/MCP 请求中的 obligation 列表只能进一步收窄它。
 
-## 5. 扩大部署前仍需完成
+## 5. 发布步骤
+
+1. 固定 Git commit、镜像 digest、Node/pnpm lockfile、配置版本和迁移清单。
+2. 备份数据库并完成可恢复性确认；记录当前 `platform.schema_migration`。
+3. 在同版本预发布环境运行 `pnpm check`、`pnpm build`、integration 和权限负向测试。
+4. 暂停不必要的治理写入，应用迁移；任何摘要不匹配都立即停止发布，不修改旧迁移。
+5. 先发布 Core，等待 `/health/ready`，再发布 Web 或 Agent Adapter。
+6. 读取 `/.well-known/akep`，核对 origin、profiles、operations、limits 和 Schema URL。
+7. 使用各独立身份执行 read/query/contribute/evaluate/review/publish 的允许与拒绝矩阵。
+8. 恢复试点流量，观察延迟、5xx、429、数据库连接、事件循环和业务审计事实。
+
+`smoke:web` 会写入并发布随机示例，只能在允许写测试数据的试点环境执行。生产只读验收应使用
+预先批准的固定测试资产和独立 Space。
+
+## 6. 回滚与向前修复
+
+- 应用制品可回滚的前提是新迁移与上一版本兼容；发布前必须验证这一点。
+- 已应用迁移文件禁止编辑、重命名或删除。数据库变更失败时优先新增向前修复迁移。
+- 出现授权、撤销或数据完整性风险时，先停止读/写流量或 fail closed，不以可用性为由恢复旧内容。
+- 回滚后重新核对 `/health/ready`、Capability、迁移表、Published 唯一性、撤销状态和旧 Exposure Receipt。
+- 若必须从备份恢复，要在隔离环境重放恢复点之后的安全事件/Outbox，并证明 Revoked/Erased
+  资产不会复活，再允许服务流量。
+
+数据库 schema 没有自动 down migration。不要在事故中手写反向 SQL；先保全审计证据并由
+数据库 Owner 与安全 Owner 共同批准恢复方案。
+
+## 7. 备份、恢复与事故响应
+
+最低运行要求：
+
+- 定期 PostgreSQL 备份、加密、保留和跨故障域副本，并做实际恢复演练。
+- 将 bearer token、Payload、内联正文和敏感来源从应用/代理/trace 日志中排除。
+- 告警至少覆盖 readiness、5xx、P95、事件循环、数据库连接、限流异常和撤销失败。
+- 事故记录保存 commit/image digest、配置版本、Policy Epoch、Request/Trace ID、相关
+  Contribution/Decision/LifecycleEvent 与时间线。
+- 发现错误知识时由 Incident Responder 执行已验证 revoke；不要让 Publisher 凭据兼任事故凭据。
+- 发现凭据泄露时先在 IdP 撤销/禁用主体并轮换相关 secret/JWKS，再评估暴露回执和审计范围。
+
+## 8. 扩大部署前仍需完成
 
 1. 外部 PDP、租户上下文与 PostgreSQL RLS 越权测试；当前配置中的单个 tenant 不是通用多租户隔离。
 2. 把内联 Payload 迁移到加密对象存储隔离区，并接入独立恶意文件扫描、解析沙箱与擦除证明。
@@ -135,3 +198,6 @@ evaluate、review、publish、incident 或 erase。其短期 access token 还必
 协调，不能把当前接口回执当作完整监管擦除证明。
 
 在这些门禁完成前，不启用 Federation、自动晋级、语义/混合检索或可执行能力包。
+
+运行端点与请求约定见[HTTP API 快速参考](../reference/http-api.md)；系统边界见
+[系统概览](../architecture/system-overview.md)。

@@ -1,9 +1,14 @@
 # Agent Knowledge Platform 技术方案 v0.1
 
-- 状态：设计基线（Draft）
-- 日期：2026-07-15
-- 适用阶段：从 0 到 MVP，并为联邦化演进预留边界
+- 状态：架构不变量与目标形态（Living Draft）
+- 最近核对：2026-07-16
+- 适用阶段：Phase 1 参考实现及后续治理/联邦演进
 - 配套协议：[AKEP v0.1](../protocols/akep-v0.1.md)
+
+> [!NOTE]
+> 本文同时包含当前实现与目标架构。当前真正启用的组件和生产缺口以
+> [实现状态](implementation-status.md)为准；运行实例能力以 Capability Discovery 为准。
+> 图中的对象存储、外部 PDP、事件投递、Federation/A2A、语义检索等不应仅凭本设计文档视为已上线。
 
 ## 1. 结论先行
 
@@ -442,9 +447,10 @@ Span 只记录不敏感的 ID、版本、计数、耗时和策略结果；正文
 
 ### 13.1 本地开发
 
-- API/Worker 单仓库，容器化运行。
-- PostgreSQL + pgvector、MinIO，可选本地 OIDC/PDP。
-- 固定种子的契约测试和小型评测集。
+- 当前默认 Compose 运行 Web、Core 与 PostgreSQL + pgvector；Core 启动时校验并应用迁移。
+- Python Worker 和 MCP Adapter 与主仓库一起构建验证，但作为独立进程按需启动，不在默认 Compose 中。
+- 当前 Payload 走受限的 inline base64 路径，没有 MinIO/对象存储；外部 PDP 也未进入本地基线。
+- 固定测试向量覆盖 Schema、JCS Revision ID、成长闭环、权限与撤销，真实数据库闭环另用 integration test 验证。
 
 ### 13.2 生产起步
 
@@ -465,6 +471,10 @@ Span 只记录不敏感的 ID、版本、计数、耗时和策略结果；正文
 
 ## 14. 分阶段路线
 
+以下阶段是能力依赖顺序，不是当前完成度声明。Phase 0 契约和 Phase 1 单节点闭环已有参考实现，
+但原定规模、对象存储、外部接入和完整生产门禁并未全部达成；精确状态见
+[实现状态](implementation-status.md)。
+
 ### Phase 0：契约与风险样本（1–2 周）
 
 - 固化 AKEP v0.1、JSON Schema、状态机、策略矩阵和 20–50 条黄金评测任务。
@@ -476,7 +486,8 @@ Span 只记录不敏感的 ID、版本、计数、耗时和策略结果；正文
 ### Phase 1：单节点最小闭环（6–8 周）
 
 - 文档上传/解析、不可变 Revision、候选区、人工审核。
-- REST text/hybrid Query、固定 Citation、AKEP reader/contributor。
+- REST text Query、固定 Citation、AKEP reader/contributor；先启用 lexical/exact，hybrid
+  只在嵌入指纹、授权下推和召回评测门禁满足后开放。
 - Exposure → Usage → Feedback、最小离线评测、可编译授权分区、OpenTelemetry。
 - REST 闭环通过后以独立进程提供只读优先的 MCP Adapter；不实现 Federation、A2A、能力包、通用 ReBAC 或 raw vector API。
 

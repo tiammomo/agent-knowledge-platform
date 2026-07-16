@@ -1,7 +1,7 @@
 # Web Console 与新手引导
 
 - 状态：可运行开发基线
-- 日期：2026-07-15
+- 最近核对：2026-07-16
 - 前端：React 19、TypeScript 7、Vite 8、原生 CSS 设计系统
 
 ## 产品目标
@@ -22,6 +22,18 @@ Console 的任务不是把数据库表包装成管理后台，而是让用户看
 | 效果证据 | 解释工作流漏斗、Usage/Feedback 归因、伤害队列和服务 SLO | evidence summary、service health |
 | Agent 接入 | 能力发现、TypeScript/Python SDK、ContextPack、MCP 和 cURL 接入 | `/.well-known/akep`、SDK/MCP |
 | 平台设置 | 查看节点、信任域、Policy Epoch 和职责分离 | capability、overview read model |
+
+### 用户职责
+
+| 用户 | 主要页面 | 关键边界 |
+| --- | --- | --- |
+| Reader / Agent 集成人员 | 知识库、Agent 接入 | 只能消费已授权 Published 知识 |
+| Contributor | 贡献知识、自己的候选 | 上传成功不等于发布成功 |
+| Evaluator | 审核中心的评测动作 | 只提交真实 EvaluationRun |
+| Curator | 审核中心 | 能验证/拒绝/补证/隔离，不能发布 |
+| Publisher | 发布治理 | 能发布/废弃，不能紧急撤销或擦除 |
+| Incident / Eraser | 发布治理的窄动作 | 分别执行已验证的撤销/擦除候选 |
+| Console Operator | 总览、效果证据、设置 | 读取全局投影，不获得写权限 |
 
 ## 首次访问流程
 

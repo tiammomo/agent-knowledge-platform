@@ -30,3 +30,7 @@
 - Manifest 的任何字节差异都会产生新 ID；用测试向量约束 JCS 实现。
 - 内容摘要可能泄漏低熵秘密；v0.1 Core 只在授权后提供明文 Manifest 身份，不能安全披露的 Manifest 不参与联邦。密文 Manifest、keyed digest 或作用域标识必须由后续独立 Profile 定义。
 - “当前发布版本”需要一次 Resolve；客户端必须区分动态 Record 与固定 Revision。
+
+规范算法、黄金向量和 Citation 结构见
+[AKEP v0.1](../../protocols/akep-v0.1.md#5-一致性与身份模型)与
+[机器可读契约](../../../specs/akep/v0.1/README.md)。

@@ -1,7 +1,10 @@
 # 信任、评测与发布治理 v0.1
 
 - 状态：Draft policy baseline
-- 日期：2026-07-15
+- 最近核对：2026-07-16
+
+本文给出风险与治理基线，不替代组织的法律、隐私、安全或行业审批。参考实现当前固定启用
+`source_document` 与 `procedure` Profile；风险分级表描述扩大资产类型后的最低治理要求。
 
 ## 1. 根规则
 
@@ -54,6 +57,20 @@ Published 决策 MUST 同时满足：
 
 任一强制 Attestation 过期、撤销或输入 Revision 被撤销时，平台重新计算决策并触发复审或级联隔离。
 
+### 4.1 职责与权限边界
+
+| 职责 | 可以 | 不可以 |
+| --- | --- | --- |
+| Contributor | 创建/修订候选、补证、撤回 | 审核、发布或降低风险 |
+| Evaluator | 对固定 Revision 提交可复现 EvaluationRun | 修改候选、审核或发布 |
+| Curator | 阅读正文/差异/证据，验证、拒绝、补证或隔离 | 改变 Published Channel |
+| Publisher | 在全部门禁满足后发布或废弃 | 代替 Curator 审核、紧急撤销或擦除 |
+| Incident Responder | 执行已验证的紧急撤销候选 | 发布新版本或擦除历史 |
+| Eraser | 执行经批准的隐私/法律擦除候选 | 把试点回执声明为完整监管证明 |
+
+同一自然人可以拥有多个短期角色，但同一高风险决策链仍应由不同主体执行并留下独立身份。
+开发 `dev-*` token 只是验证职责边界的本地工具，不是生产审批机制。
+
 ## 5. 自动发布的严格边界
 
 只有同时满足以下条件的 R0 类型可考虑自动发布：
@@ -104,3 +121,6 @@ Erase 使用独立 `akep:erase`、Privacy/Legal 批准与保留冲突检查；In
 - 大量互刷 Feedback 不能使资产自动晋级。
 - 撤销后旧事件、旧快照、缓存和索引均不能复活资产。
 - 任何 Published 结果都能定位到精确 Revision、Payload 范围、来源和发布决策。
+
+运行时角色与请求约定见[HTTP API 快速参考](../reference/http-api.md)，当前已实现门禁见
+[实现状态](../architecture/implementation-status.md)。

@@ -1,18 +1,40 @@
 # 本地开发运行手册
 
+- 状态：当前参考实现
+- 最近核对：2026-07-16
+- 适用范围：本地开发、演示与测试
+
 ## 环境
 
 - Node.js 24、Corepack、pnpm 11。
 - Python 3.13 或 3.14、uv。
 - Docker Compose（用于 PostgreSQL 17 + pgvector 0.8.2）。
 
+只运行容器化 Web/Core/PostgreSQL 时，宿主机只需要 Docker Compose。执行 `pnpm check` 或
+在宿主机启动服务时才需要 Node.js、pnpm、Python 与 uv。
+
+可选的环境核对：
+
+```bash
+node --version
+corepack pnpm --version
+python --version
+uv --version
+docker compose version
+```
+
+Node.js 必须是 24.x；包管理器版本由根 `package.json` 的 `packageManager` 固定。
+
 ## 启动
+
+| 方式 | 适合场景 | Web 地址 | Core 地址 |
+| --- | --- | --- | --- |
+| 完整 Compose | 第一次体验、UI/API 烟雾测试 | `http://localhost:8080` | `http://localhost:3000` |
+| PostgreSQL Compose + 宿主机进程 | 开发调试、热更新 | `http://localhost:5173` | `http://localhost:3000` |
 
 完整容器化开发环境：
 
 ```bash
-corepack enable
-pnpm install
 AKEP_HOST_PORT=3000 AKEP_WEB_PORT=8080 docker compose --profile app up --build
 ```
 
@@ -44,6 +66,12 @@ pnpm dev:web
 ```
 
 Node.js 会通过 `--env-file-if-exists` 读取仓库根目录 `.env`。
+
+停止服务但保留数据库卷：
+
+```bash
+docker compose --profile app down
+```
 
 ## SDK 与 MCP Adapter
 
@@ -118,6 +146,16 @@ PostgreSQL 事务、不可变触发器、Outbox、撤销和反馈证据。
 `smoke:web` 通过 Web Origin 真实创建示例候选，以 Curator 核验、Publisher 发布，再执行
 查询并断言 Revision 与 Citation 可见；它会向本地数据库写入一条带随机身份的示例知识。
 
+推荐按改动范围选择：
+
+| 改动 | 最小验证 |
+| --- | --- |
+| README/docs | `pnpm docs:check`、`pnpm contracts:check`（协议引用变化时） |
+| TypeScript Core/Web/SDK/MCP | `pnpm check` |
+| Docker/构建配置 | `pnpm build`、`docker compose --profile app build` |
+| 数据库迁移/事务/检索 | `pnpm test:integration`、`infra/postgres/verify.sql` |
+| 端到端产品闭环 | Compose + `pnpm smoke:web` |
+
 ## 数据重置
 
 以下命令会删除本项目的本地 PostgreSQL 卷及其中所有数据：
@@ -125,6 +163,45 @@ PostgreSQL 事务、不可变触发器、Outbox、撤销和反馈证据。
 ```bash
 docker compose --profile app down -v
 ```
+
+该命令不可恢复。只想重启服务时使用不带 `-v` 的 `docker compose --profile app down`。
+
+## 常见问题
+
+### 端口已经被占用
+
+```bash
+AKEP_HOST_PORT=43117 AKEP_WEB_PORT=43118 docker compose --profile app up --build
+```
+
+此时 Web 为 `http://localhost:43118`，Core 为 `http://localhost:43117`。
+
+### `/health/live` 正常但 `/health/ready` 失败
+
+`live` 只说明进程存活，`ready` 还会检查数据库、迁移和必要扩展。先查看：
+
+```bash
+docker compose ps
+docker compose logs postgres core
+pnpm db:migrate
+```
+
+不要修改已经应用的迁移文件；迁移摘要变化会被视为完整性错误。修复应新增下一个编号的迁移。
+
+### `pnpm check` 在 Worker 步骤失败
+
+确认 Python 3.13/3.14 与 uv 可用。Worker 依赖由
+`workers/knowledge-worker/uv.lock` 固定，不要用根 Node.js 依赖替代。
+
+### MCP 启动后终端没有交互界面
+
+这是预期行为。Adapter 使用 stdio MCP transport，需要由 MCP Host 启动和通信；直接运行只会
+等待协议输入。先用 SDK 或 HTTP cURL 验证 Core，再配置 MCP Host。
+
+### 查询返回空结果
+
+Query 只检索已授权的 Published Channel。首次启动数据库为空时，先完成 Web 新手引导或运行
+`smoke:web` 创建并发布随机示例；Candidate、Revoked 和无权内容不会出现在结果中。
 
 ## 当前开发限制
 
@@ -134,5 +211,8 @@ docker compose --profile app down -v
 - Feedback 只有绑定同组织、任务/上下文/时间一致的 Usage 后才可聚合；自作者和未知相关性信号仍保留为原始证据，不进入质量结论。
 - MCP Adapter 已实现为可选独立 stdio 进程，不在默认 Compose 中自动启动；Federation、
   Ingestion Connector 和 A2A Adapter 仍未在默认运行时启用。
-- Web Console 将六个开发身份映射打包在前端，仅适合本地演示；生产必须改为服务端会话或
+- Web Console 将八个访问/治理开发身份映射打包在前端（Prometheus observer 不进入前端），仅适合本地演示；生产必须改为服务端会话或
   OIDC Authorization Code + PKCE，并避免向浏览器暴露高权限长期凭据。
+
+项目文档地图见[文档入口](../README.md)，端点与请求头见
+[HTTP API 快速参考](../reference/http-api.md)。

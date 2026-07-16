@@ -7,11 +7,12 @@
   },
   "scripts": {
     "build": "pnpm --filter @akep/sdk build && pnpm --filter @akep/mcp-server build && pnpm --filter @akep/core build && pnpm --filter @akep/web build",
-    "check": "pnpm typecheck && pnpm test && pnpm contracts:check && pnpm worker:check && pnpm sdk:check",
+    "check": "pnpm typecheck && pnpm test && pnpm contracts:check && pnpm docs:check && pnpm worker:check && pnpm sdk:check",
     "contracts:check": "pnpm --filter @akep/core contracts:check",
     "db:migrate": "pnpm --filter @akep/core db:migrate",
     "dev": "pnpm --filter @akep/core dev",
     "dev:web": "pnpm --filter @akep/web dev",
+    "docs:check": "node scripts/check-docs.mjs",
     "test:integration": "TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgres://akep:akep-local-only@localhost:5432/akep} pnpm --filter @akep/core test",
     "start": "pnpm --filter @akep/core start",
     "smoke:web": "pnpm --filter @akep/web smoke",

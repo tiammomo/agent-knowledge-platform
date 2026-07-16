@@ -1,8 +1,18 @@
 # 实现状态与生产门禁
 
-- 状态：可运行、可做单租户隔离试点的 P0 基线
-- 日期：2026-07-15
+- 状态：可运行的 Phase 1 参考实现；仅限单租户隔离试点
+- 最近核对：2026-07-16
 - 协议：AKEP v0.1 实验草案
+
+本页只描述参考实现当前真正启用的能力。目标架构见
+[技术方案 v0.1](technical-design-v0.1.md)，协议中定义但运行时未启用的操作不能计为“已实现”。
+实际部署仍应以 `GET /.well-known/akep` 的 Capability Discovery 为准。
+
+状态口径：
+
+- **可运行**：存在运行时代码和自动化测试，可在文档支持的本地/试点形态中调用。
+- **已验证**：有跨实现测试向量或契约测试，但不一定是独立运行服务。
+- **有意关闭**：Schema/数据结构可能预留，但默认路由或能力声明不启用。
 
 ## 已实现
 
@@ -12,7 +22,7 @@
 | ContextPack 扩展 | 可运行 | 按字符/段落/估算 token 预算组装上下文，返回稳定 Citation、义务、质量警告与 Exposure Receipt |
 | Contributor | 可运行 | create/revise/lifecycle 候选、幂等、证据补充、撤回、Usage、Feedback |
 | Curator | 可运行 | 独立验证、拒绝、补证请求、隔离；不能修改 Published Channel |
-| Publisher | 可运行 | 发布、废弃、紧急撤销、擦除使用分离 scope；PostgreSQL 原子事务与 Outbox |
+| Publisher / Incident / Eraser | 可运行 | Publisher 负责发布/废弃；紧急撤销与擦除分别使用独立 scope；PostgreSQL 原子事务与 Outbox |
 | Revision 身份 | 已验证 | TypeScript/Python RFC 8785 + SHA-256 黄金向量一致 |
 | 存储 | 可运行 | PostgreSQL 17、pgvector、不可变 Revision 触发器、检索投影、迁移摘要锁 |
 | Evaluation / 质量门禁 | 可运行 | 发布精确执行 Profile `requiredAttestations`；Schema/静态安全扫描、Curator 审核和 Publisher 策略批准生成不可变证明；真实 EvaluationRun 可额外生成 benchmark 证明 |
@@ -59,3 +69,5 @@ Web Console 是开发基线而非生产管理面：浏览器内置的 `dev-*` to
 5. 用威胁样本、权限矩阵、撤销传播、迁移回滚和容量压测完成独立验收。
 
 单租户隔离试点部署步骤见[隔离生产试点运行手册](../runbooks/production-pilot.md)。
+本地验证入口见[本地开发手册](../runbooks/local-development.md)，HTTP 运行端点见
+[API 快速参考](../reference/http-api.md)。
