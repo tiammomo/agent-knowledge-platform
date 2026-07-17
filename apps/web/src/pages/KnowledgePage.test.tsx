@@ -50,7 +50,24 @@ function revision(assetValue: ConsoleAsset, content: string): RevisionDetail {
   return {
     content,
     resource: {
-      manifest: { payloads: [] },
+      manifest: {
+        payloads: [],
+        policy: {
+          allowedPurposes: ["customer-support"],
+          classification: "internal",
+          export: "deny",
+        },
+        provenance: {
+          generatedBy: { actor: "https://identity.test/teams/support" },
+          primarySources: ["https://docs.test/refund"],
+        },
+        scope: {
+          assumptions: ["仅适用于直营网店"],
+          jurisdiction: "CN",
+          locale: "zh-CN",
+          reviewAfter: "2026-10-01T00:00:00.000Z",
+        },
+      },
       revisionId: assetValue.revisionId,
     },
   };
@@ -66,6 +83,10 @@ function result(assetValue: ConsoleAsset): QueryResultItem {
       quote: assetValue.summary,
     }],
     obligations: assetValue.obligations,
+    profile: assetValue.profile,
+    provenance: {
+      primarySources: ["https://docs.test/refund"],
+    },
     qualityAttestationRefs: assetValue.qualityAttestationRefs,
     qualityDecision: assetValue.qualityDecision,
     qualityReasons: assetValue.qualityReasons,
@@ -84,8 +105,10 @@ function response(
   nextCursor?: string,
 ): QueryResponse {
   return {
+    indexedThrough: "2026-07-18T00:00:00.000Z",
     ...(nextCursor === undefined ? {} : { nextCursor }),
     policyEpoch: "test-1",
+    projectionGeneration: "akep-lexical-v2/postgres",
     queryReceiptId: `https://knowledge.test/exposures/${receipt}`,
     results: [result(assetValue)],
     snapshot: "snapshot-1",
@@ -189,5 +212,88 @@ describe("knowledge explorer request identity", () => {
     );
     expect(location.get("q")).toBeNull();
     expect(location.get("space")).toBe(SPACE);
+  });
+
+  it("opens a Query result even when the Console projection does not contain it", async () => {
+    const selected = asset("a", "Refund procedure");
+    vi.mocked(getAssets).mockResolvedValue([]);
+    vi.mocked(searchKnowledge).mockResolvedValue(response(selected, "query-only"));
+    vi.mocked(getRevisionDetail).mockResolvedValue(revision(selected, "Governed refund content"));
+    const user = userEvent.setup();
+    renderPage("/knowledge?q=refund");
+
+    await user.click(await screen.findByRole("button", { name: /Refund procedure/u }));
+
+    expect(getRevisionDetail).toHaveBeenCalledWith(SPACE, selected.revisionId);
+    expect(await screen.findByText("Governed refund content")).toBeTruthy();
+    expect(screen.queryByText(/投影尚未就绪/u)).toBeNull();
+  });
+
+  it("explains ranking, policy, source and applicability without calling the score trust", async () => {
+    const selected = asset("a", "Refund procedure");
+    vi.mocked(getAssets).mockResolvedValue([selected]);
+    vi.mocked(searchKnowledge).mockResolvedValue(response(selected, "explained"));
+    vi.mocked(getRevisionDetail).mockResolvedValue(revision(selected, "Refund content"));
+    const user = userEvent.setup();
+    renderPage("/knowledge?q=refund");
+
+    expect(await screen.findByText(/索引截至/u)).toBeTruthy();
+    expect(screen.getByText(/投影：akep-lexical/u)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /Refund procedure/u }));
+
+    expect(await screen.findByText("为什么返回这条知识")).toBeTruthy();
+    expect(screen.getAllByText("https://docs.test/refund").length).toBeGreaterThan(0);
+    expect(screen.getByText("仅适用于直营网店")).toBeTruthy();
+    expect(screen.getAllByText("customer-support").length).toBeGreaterThan(0);
+    expect(screen.getByText(/本次查询相关性，不代表知识可信度/u)).toBeTruthy();
+    expect(screen.queryByText(/可信度 0\.80/u)).toBeNull();
+  });
+
+  it("shows only current browsable states outside Query results", async () => {
+    const published = asset("a", "Published asset");
+    const deprecated = { ...asset("b", "Deprecated asset"), status: "deprecated" as const };
+    const superseded = { ...asset("c", "Superseded asset"), status: "superseded" as const };
+    const revoked = { ...asset("d", "Revoked asset"), status: "revoked" as const };
+    const erased = { ...asset("e", "Erased asset"), status: "erased" as const };
+    vi.mocked(getAssets).mockResolvedValue([
+      published,
+      deprecated,
+      superseded,
+      revoked,
+      erased,
+    ]);
+    renderPage();
+
+    expect(await screen.findByText("Published asset")).toBeTruthy();
+    expect(screen.getByText("Deprecated asset")).toBeTruthy();
+    expect(screen.queryByText("Superseded asset")).toBeNull();
+    expect(screen.queryByText("Revoked asset")).toBeNull();
+    expect(screen.queryByText("Erased asset")).toBeNull();
+  });
+
+  it("explains zero results and can broaden a Space-filtered search", async () => {
+    const empty: QueryResponse = {
+      indexedThrough: "2026-07-18T00:00:00.000Z",
+      policyEpoch: "test-1",
+      projectionGeneration: "akep-lexical-v2/postgres",
+      queryReceiptId: "https://knowledge.test/exposures/empty",
+      results: [],
+      snapshot: "snapshot-empty",
+    };
+    const selected = asset("a", "Broader result");
+    vi.mocked(getAssets).mockResolvedValue([selected]);
+    vi.mocked(searchKnowledge)
+      .mockResolvedValueOnce(empty)
+      .mockResolvedValueOnce(response(selected, "broadened"));
+    const user = userEvent.setup();
+    renderPage(`/knowledge?q=refund&space=${encodeURIComponent(SPACE)}`);
+
+    expect(await screen.findByText("当前授权范围内没有足够证据")).toBeTruthy();
+    expect(screen.getByText(/不代表系统确认答案不存在/u)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "清除筛选并重搜" }));
+
+    await waitFor(() => expect(searchKnowledge).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(searchKnowledge).mock.calls[1]?.[0]).toEqual({ query: "refund" });
+    expect(await screen.findByText("Broader result")).toBeTruthy();
   });
 });

@@ -1,7 +1,7 @@
 # 实现状态与生产门禁
 
 - 状态：可运行的 Phase 1 参考实现；仅限单租户隔离试点
-- 最近核对：2026-07-17
+- 最近核对：2026-07-18
 - 协议：AKEP v0.1 实验草案
 
 本页只描述参考实现当前真正启用的能力。目标架构见
@@ -34,7 +34,7 @@
 | MCP Adapter | 可运行 | 独立 stdio 进程，暴露 search/context/get/usage/feedback/candidate；不持有治理发布能力 |
 | 生产认证基线 | 可运行 | OIDC Remote JWKS JWT 验证、issuer/audience/算法/`typ`/寿命约束、签名 Tenant/obligation claim、RFC 9728 metadata；production 禁止开发令牌 |
 | 可观测性基线 | 可运行 | Trace Context、可选 OTLP/HTTP trace、受保护 Prometheus 指标、p50/p95/error-rate/SLO 健康视图 |
-| Web Console | 可运行 | React 19 + TypeScript + Vite；八个响应式产品页面，全部读取真实 API 状态 |
+| Web Console | 可运行 | React 19 + TypeScript + Vite；八个响应式产品页面；总览按真实工作流状态生成职责化下一步，知识检索展示授权/策略/投影证据、来源和适用边界，Agent 页可运行无凭证公开端点预检 |
 | 新手引导 | 可运行 | 五步可恢复向导，真实执行 discovery → candidate → review → publish → query |
 | Console Read Model | 可运行 | 私有 no-store 总览、资产、贡献、效果证据和服务健康投影；Reviewer 可读取候选正文和证据 |
 | 持续交付基线 | 可运行 | GitHub CI 执行全量检查、构建与 PostgreSQL 集成测试；安全工作流执行生产依赖、Secret 和 High/Critical 生产镜像漏洞门禁；关键边界由 CODEOWNERS 评审 |
@@ -49,6 +49,11 @@ Web Console 是开发基线而非生产管理面：浏览器内置的 `dev-*` to
 生产身份验证、固定 Tenant Principal、Query Space 前置过滤、数据库 Tenant 纵深防御与基础观测
 已经落地，但仍需完成下面的动态租户、外部策略、存储和运维门禁；不能将
 开发镜像或浏览器内置的 `dev-*` token 直接暴露到公网。
+
+总览职责卡片是按全局投影状态归类的开发运营入口，不是生产用户的个性化任务队列。Agent 页的
+预检仅以 `credentials: omit` 从当前浏览器读取 live/ready、Capability、RFC 9728 metadata 和三份
+关键 Schema；它不发送 `Authorization`，也不验证真实 Agent token、部署网络、Space、purpose
+或 obligation。Integration Registry、自助凭据、授权审批、canary 与停用控制面仍属于有意关闭能力。
 
 ## 有意关闭
 

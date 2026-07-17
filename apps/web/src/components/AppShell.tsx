@@ -20,7 +20,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useOnboarding } from "../contexts/OnboardingContext";
 
 interface NavigationItem {
-  readonly badge?: boolean;
   readonly icon: LucideIcon;
   readonly label: string;
   readonly to: string;
@@ -43,7 +42,7 @@ const NAVIGATION: readonly NavigationGroup[] = [
   {
     label: "质量与治理",
     items: [
-      { icon: BadgeCheck, label: "审核中心", to: "/review", badge: true },
+      { icon: BadgeCheck, label: "审核中心", to: "/review" },
       { icon: ShieldCheck, label: "发布治理", to: "/governance" },
       { icon: Activity, label: "效果证据", to: "/evaluation" },
     ],
@@ -134,7 +133,6 @@ export function AppShell() {
                 >
                   <item.icon size={19} aria-hidden="true" />
                   <span>{item.label}</span>
-                  {item.badge ? <span className="nav-dot" aria-label="有待处理内容" /> : null}
                 </NavLink>
               ))}
             </div>
@@ -155,8 +153,8 @@ export function AppShell() {
           <div className="user-row">
             <div className="user-avatar">MO</div>
             <div>
-              <strong>本地管理员</strong>
-              <span>Development</span>
+              <strong>开发多角色演示</strong>
+              <span>非真实登录身份</span>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 # Web Console 与新手引导
 
 - 状态：可运行开发基线
-- 最近核对：2026-07-17
+- 最近核对：2026-07-18
 - 前端：React 19、TypeScript 7、Vite 8、原生 CSS 设计系统
 
 ## 产品目标
@@ -14,13 +14,13 @@ Console 的任务不是把数据库表包装成管理后台，而是让用户看
 
 | 页面 | 用户任务 | 数据来源 / 写动作 |
 | --- | --- | --- |
-| 总览 | 看知识、待审核、Usage、Feedback 和最近活动 | `GET /console/v1/overview` |
-| 知识库 | 浏览 Published Channel，执行带引用查询，查看 Manifest | assets、queries、revision API |
+| 总览 | 看知识、待推进、Usage、Feedback、最近活动，并按真实状态选择职责化下一步 | `GET /console/v1/overview` |
+| 知识库 | 浏览 Published/Deprecated 版本，执行带引用查询，解释授权/排序证据，查看来源、Manifest 和适用边界 | assets、queries、revision API |
 | 贡献知识 | 编写内容和边界，在浏览器计算摘要并提交候选 | `POST /contributions` |
 | 审核中心 | 查看候选正文/差异，核验证据、范围和义务，先运行评测再给出独立决策 | contributions、evaluation-runs、decisions API |
 | 发布治理 | 发布已验证候选，发起/执行废弃、撤销、擦除 | lifecycle contributions/actions |
 | 效果证据 | 解释工作流漏斗、Usage/Feedback 归因、伤害队列和服务 SLO | evidence summary、service health |
-| Agent 接入 | 能力发现、TypeScript/Python SDK、ContextPack、MCP 和 cURL 接入 | `/.well-known/akep`、SDK/MCP |
+| Agent 接入 | 能力发现、无凭证公开预检、TypeScript/Python SDK、ContextPack、MCP 和 cURL 接入 | health、`/.well-known/akep`、OAuth metadata、Schema、SDK/MCP |
 | 平台设置 | 查看节点、信任域、Policy Epoch 和职责分离 | capability、overview read model |
 
 ### 目标运营控制面（尚未实现）
@@ -49,6 +49,44 @@ Console 的任务不是把数据库表包装成管理后台，而是让用户看
 | Publisher | 发布治理 | 能发布/废弃，不能紧急撤销或擦除 |
 | Incident / Eraser | 发布治理的窄动作 | 分别执行已验证的撤销/擦除候选 |
 | Console Operator | 总览、效果证据、设置 | 读取全局投影，不获得写权限 |
+
+## 当前职责工作台与可信检索体验
+
+总览的“现在最值得处理”由 `GET /console/v1/overview` 的实际数量和工作流状态生成，最多展示四个
+当前可执行方向。例如 candidate/validating 指向 Curator 审核，needs_evidence 指向 Contributor
+补证，verified 指向 Publisher，已发布但尚无使用证据时指向 Reader 查询或 Agent 接入。最近活动
+也按状态进入审核、补证、发布治理或知识库，不再把所有记录都导向贡献页；五步引导完成后，快速
+上手卡片会退出主工作区。
+
+这个视图是开发环境中“按职责归类”的运营工作台，不是根据生产登录主体、组织成员或值班轮次
+生成的个人任务队列。浏览器仍使用多个 `dev-*` 身份演示职责分离；目标 Integrations、
+Maintenance 和 Spaces & Sharing 控制面仍未实现。
+
+知识检索把相关性、治理质量和适用范围分开表达：
+
+- 结果顶部展示授权 Space、`customer-support` purpose、Policy Epoch、投影代次和索引水位。
+- 每条结果展示 Published/Deprecated 状态、资产类型、Space、质量结论、来源数、Passage Citation
+  与义务；“本次排序分”只表示本次查询相关性，不称为信任分。
+- 详情解释召回方法、质量结论、稳定引用、策略水位和 Exposure Receipt，并展示主要来源、生成主体、
+  locale/jurisdiction、复审时间、有效期、允许用途、分类/导出限制和适用假设（Manifest 已声明时）。
+- 查询结果可直接以返回的固定 Revision 打开，不依赖 Console 资产列表恰好已经投影出同一版本。
+- 零结果明确限定为“当前授权范围内没有足够证据”，可浏览可访问知识、清除筛选重搜、修改关键词
+  或贡献候选；界面不会把零结果解释成答案绝对不存在。
+
+## Agent 公开接入预检
+
+Agent 接入页可从当前浏览器运行无凭证公开预检，检查：
+
+1. `/health/live` 和 `/health/ready`，包括数据库 readiness。
+2. `/.well-known/akep` 的 AKEP 0.1、有效期、公开 Origin、Reader 操作和 ContextPack extension。
+3. RFC 9728 Protected Resource metadata 的 resource、header bearer method、Reader scopes；缺少
+   `authorization_servers` 会给出提醒，而不是把本地人工 token 配置误判为生产就绪。
+4. Query request、ContextPack request/response 三份 Capability Schema 的同源可读性与 ETag。
+
+预检请求使用 `credentials: omit`，不发送 cookie 或 `Authorization`，也不把 Discovery 可见写成
+“节点已连接”。结果只证明当前浏览器网络能访问这些公开契约，不能证明生产 token 有效，不能覆盖
+Agent 实际部署网络，也不能验证其 Tenant/Space/purpose/obligation 授权。上线前仍须从真实 Agent
+环境运行认证负向测试和完整契约闭环；Agent 自身必须执行返回义务并保留稳定 Citation。
 
 ## 首次访问流程
 
@@ -91,6 +129,10 @@ CSP、禁止 frame 嵌入并关闭相机、麦克风和定位权限。
 当前浏览器 bundle 中的多个 `dev-*` token 是明确的本地开发机制。上线前必须替换为 OIDC/OAuth
 登录和短期会话，并在现有签名 Tenant Principal 与固定 Tenant RLS 上完成控制面动态 Tenant、
 外部 PDP/完整策略下推、CSRF/会话防护、审计导出及高权限二次确认。
+
+Agent 公开预检只读取公开健康端点、Discovery、OAuth Protected Resource metadata 和 Schema，
+显式省略浏览器凭据。它不是 token 检查器、越权探测器或生产接入证明；真实 token、Agent 网络、
+Space、purpose、义务与撤销传播必须在目标运行环境单独验证。
 
 ## 验收方式
 

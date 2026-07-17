@@ -1,7 +1,7 @@
 # 外部系统接入运行手册
 
 - 状态：当前人工接入路径 + 目标自动化清单
-- 最近核对：2026-07-17
+- 最近核对：2026-07-18
 - 架构前置：[外部系统接入设计](../architecture/external-integration.md)
 
 本手册用于把一个外部业务系统或 Agent Host 安全接入知识平台。当前参考实现没有自助 Integration
@@ -60,6 +60,17 @@ curl --fail https://knowledge.example.com/.well-known/oauth-protected-resource
 
 核对 `baseUrl`、`versions`、`profiles`、`operations`、`schemas`、`limits` 和
 `expiresAt`。客户端缓存到 expiresAt 之前，并能在 Capability 变化后重新发现。
+
+本地 Web Console 的“Agent 接入”页可辅助运行一次无凭证公开预检。它从当前浏览器检查
+live/ready、AKEP 0.1 Capability 的有效期/同源/Reader 操作/ContextPack extension、RFC 9728
+resource/header bearer/Reader scopes，以及 Query 和 ContextPack 三份关键 Schema 的同源可读性与
+ETag。预检使用 `credentials: omit`，不发送 cookie 或 `Authorization`；缺少
+`authorization_servers` 时会提示生产接入仍需配置授权服务器。
+
+这项预检不能替代客户端契约测试。它只证明当前浏览器到公开端点的路径，不验证生产 token，
+不代表 Agent 部署网络可达，也不验证实际 Tenant、Space、purpose、scope 或 obligation。预检通过
+后，仍必须从 Agent 的真实运行环境重复 Discovery/TLS/超时检查，并继续完成下列认证负向测试、
+最小查询和 Usage/Feedback 闭环。
 
 ### 3.2 认证负向测试
 
@@ -171,6 +182,8 @@ Query 正文、Payload、source secret 或低基数敏感 Space 名。
 - [ ] Owner、安全联系人、Tenant/Space、purpose、义务和配额已批准。
 - [ ] audience-bound 短期 token 和密钥轮换可用。
 - [ ] Discovery/RFC 9728 metadata 与 Schema 可访问。
+- [ ] Web 公开预检（如使用）只作为公开契约辅助检查；已从真实 Agent 网络重新验证。
+- [ ] 真实 Agent token 的 audience/Tenant/Space/purpose/scope/obligation 正负向矩阵通过。
 - [ ] 401/403/404/410/412/429 和跨 Space 负向测试通过。
 - [ ] Query/Citation/Exposure → Usage → Feedback 闭环通过。
 - [ ] 客户端无治理 scope；Contribution（如有）只能创建 Candidate。

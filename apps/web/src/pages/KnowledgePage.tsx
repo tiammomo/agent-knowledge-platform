@@ -30,6 +30,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  formatRelativeTime,
   LoadingState,
   PageHeader,
   shortId,
@@ -37,8 +38,12 @@ import {
 } from "../components/ui";
 
 interface DisplayedResult {
+  readonly indexedThrough: string;
   readonly item: QueryResultItem;
+  readonly policyEpoch: string;
+  readonly projectionGeneration: string;
   readonly queryReceiptId: string;
+  readonly snapshot: string;
 }
 
 export interface KnowledgeSearchCriteria {
@@ -50,8 +55,12 @@ export interface KnowledgeSearchCriteria {
 
 interface SearchSession {
   readonly criteria: KnowledgeSearchCriteria;
+  readonly indexedThrough: string;
   readonly key: string;
   readonly nextCursor?: string;
+  readonly policyEpoch: string;
+  readonly projectionGeneration: string;
+  readonly snapshot: string;
 }
 
 export function KnowledgePage() {
@@ -136,12 +145,23 @@ export function KnowledgePage() {
         spaceId: criteria.spaceId,
       });
       if (requestId !== searchRequestId.current) return;
-      const page = response.results.map((item) => ({ item, queryReceiptId: response.queryReceiptId }));
+      const page = response.results.map((item) => ({
+        indexedThrough: response.indexedThrough,
+        item,
+        policyEpoch: response.policyEpoch,
+        projectionGeneration: response.projectionGeneration,
+        queryReceiptId: response.queryReceiptId,
+        snapshot: response.snapshot,
+      }));
       setResults((current) => append ? [...(current ?? []), ...page] : page);
       setSearchSession({
         criteria,
+        indexedThrough: response.indexedThrough,
         key: searchCriteriaKey(criteria),
         ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }),
+        policyEpoch: response.policyEpoch,
+        projectionGeneration: response.projectionGeneration,
+        snapshot: response.snapshot,
       });
       const next = new URLSearchParams();
       next.set("q", criteria.query);
@@ -204,7 +224,7 @@ export function KnowledgePage() {
 
   const visibleAssets = useMemo(
     () => (assets.data ?? []).filter((asset) =>
-      asset.status !== "erased" &&
+      ["published", "deprecated"].includes(asset.status) &&
       (space === undefined || asset.spaceId === space) &&
       (assetType === "" || asset.assetType === assetType) &&
       (label.trim() === "" || asset.labels.includes(label.trim()))),
@@ -245,6 +265,14 @@ export function KnowledgePage() {
     void loadRevision(asset);
   };
 
+  const openQueryResult = (evidence: DisplayedResult) => {
+    const item = evidence.item;
+    const asset = (assets.data ?? []).find((candidate) =>
+      candidate.spaceId === item.spaceId && candidate.revisionId === item.revisionId,
+    ) ?? assetFromQueryResult(evidence);
+    openAsset(asset, evidence);
+  };
+
   const recordOutcome = async (outcome: "harmed" | "helped" | "neutral") => {
     if (selectedEvidence === undefined) return;
     setOutcomeState("saving");
@@ -266,6 +294,11 @@ export function KnowledgePage() {
     if (item === undefined) return;
     await navigator.clipboard.writeText(JSON.stringify({
       citations: item.citations,
+      obligations: item.obligations,
+      policyEpoch: selectedEvidence?.policyEpoch,
+      qualityAttestationRefs: item.qualityAttestationRefs,
+      qualityDecision: item.qualityDecision,
+      queryReceiptId: selectedEvidence?.queryReceiptId,
       revisionId: item.revisionId,
       spaceId: item.spaceId,
     }, null, 2));
@@ -273,10 +306,33 @@ export function KnowledgePage() {
     window.setTimeout(() => setCopied(false), 1600);
   };
 
-  if (assets.loading) return <LoadingState />;
-  if (assets.error !== undefined) return <ErrorState error={assets.error} retry={assets.refresh} />;
+  if (assets.loading && initialQuery.length === 0 && results === undefined) {
+    return <LoadingState />;
+  }
+  if (assets.error !== undefined && initialQuery.length === 0 && results === undefined) {
+    return <ErrorState error={assets.error} retry={assets.refresh} />;
+  }
 
   const count = results === undefined ? visibleAssets.length : displayedResults?.length ?? 0;
+  const hasNarrowingFilters = assetType !== "" || label.trim() !== "" || space !== undefined;
+  const broadenSearch = async () => {
+    const criteria = buildSearchCriteria(query, "", "", undefined);
+    setAssetType("");
+    setLabel("");
+    await executeSearch(criteria);
+  };
+  const browseKnowledge = () => {
+    searchRequestId.current += 1;
+    setAssetType("");
+    setLabel("");
+    setQuery("");
+    setResults(undefined);
+    setSearchSession(undefined);
+    setSearchError(undefined);
+    setSearching(false);
+    clearDetail();
+    setParams(new URLSearchParams(), { replace: true });
+  };
   return (
     <>
       <PageHeader eyebrow="Knowledge Explorer" title="查找可信、可引用的知识" subtitle="检索返回 Passage 级引用、真实相关性、质量证明和使用义务；证据不足时返回空结果。" />
@@ -304,12 +360,25 @@ export function KnowledgePage() {
       <div className={`knowledge-layout ${selected === undefined ? "knowledge-layout-unselected" : ""}`}>
         <section className="knowledge-results" aria-label="知识结果">
           <div className="result-summary"><div><strong>{count}</strong><span>{results === undefined ? " 个知识版本" : ` 条与“${searchSession?.criteria.query ?? params.get("q") ?? ""}”相关的结果`}</span></div><label>排序<select aria-label="结果排序" onChange={(event) => setSort(event.target.value as typeof sort)} value={sort}><option value="relevance">相关性</option><option value="title">标题</option></select></label></div>
+          {searchSession === undefined ? null : <SearchEvidenceStrip session={searchSession} />}
           {(results === undefined ? visibleAssets : displayedResults ?? []).length === 0 ? (
-            <Card><EmptyState icon={<CircleSlash />} title="暂时没有匹配的知识" description="尝试更短的关键词、调整筛选，或贡献第一条候选知识。" action={<Link className="button button-primary" to="/contribute">贡献新知识</Link>} /></Card>
+            <Card><EmptyState
+              icon={<CircleSlash />}
+              title={results === undefined ? "当前还没有可浏览的知识" : "当前授权范围内没有足够证据"}
+              description={results === undefined
+                ? "Published Channel 为空；贡献会先进入 Candidate，不会绕过审核直接可见。"
+                : "当前可访问 Space、customer-support 用途和 Published/Deprecated 版本中没有可引用结果；这不代表系统确认答案不存在。"}
+              action={<div className="empty-actions">
+                {results === undefined ? null : <Button onClick={browseKnowledge} variant="secondary">浏览可访问知识</Button>}
+                {results !== undefined && hasNarrowingFilters ? <Button onClick={() => void broadenSearch()} variant="secondary">清除筛选并重搜</Button> : null}
+                <Button onClick={() => searchInput.current?.focus()} variant="ghost">修改关键词</Button>
+                <Link className="button button-primary" to="/contribute">贡献候选知识</Link>
+              </div>}
+            /></Card>
           ) : results === undefined ? (
             visibleAssets.map((asset) => <AssetRow asset={asset} key={`${asset.spaceId}-${asset.revisionId}`} onOpen={() => openAsset(asset)} selected={selected?.spaceId === asset.spaceId && selected.revisionId === asset.revisionId} />)
           ) : (
-            (displayedResults ?? []).map((entry) => <QueryRow item={entry.item} key={`${entry.item.spaceId}-${entry.item.revisionId}`} onOpen={() => { const asset = (assets.data ?? []).find((candidate) => candidate.spaceId === entry.item.spaceId && candidate.revisionId === entry.item.revisionId); if (asset === undefined) setSearchError(new Error("检索结果对应的资产投影尚未就绪，请刷新后重试。")); else openAsset(asset, entry); }} selected={selected?.spaceId === entry.item.spaceId && selected.revisionId === entry.item.revisionId} />)
+            (displayedResults ?? []).map((entry) => <QueryRow item={entry.item} key={`${entry.item.spaceId}-${entry.item.revisionId}`} onOpen={() => openQueryResult(entry)} selected={selected?.spaceId === entry.item.spaceId && selected.revisionId === entry.item.revisionId} />)
           )}
           {searchSession?.nextCursor === undefined ? null : sessionMatchesDraft ? <Button className="load-more" disabled={searching} onClick={() => void loadMore()} variant="secondary">加载更多结果</Button> : <p className="pagination-stale" role="status">搜索词或筛选条件已更改，请先应用后再继续分页，旧 Cursor 不会用于新条件。</p>}
         </section>
@@ -323,7 +392,9 @@ export function KnowledgePage() {
               <div className="detail-head"><div><span className="asset-type">{selected.assetType}</span><StatusBadge status={selected.status} /></div><button className="icon-button" aria-label="关闭详情" onClick={clearDetail}><X size={18} /></button></div>
               <h2>{selected.title}</h2><p>{selected.summary ?? "此知识版本没有摘要。"}</p>
               <dl className="detail-metadata"><div><dt>Record</dt><dd title={selected.recordId}>{shortId(selected.recordId, 30)}</dd></div><div><dt>Revision</dt><dd title={selected.revisionId}>{shortId(selected.revisionId, 30)}</dd></div><div><dt>Space</dt><dd title={selected.spaceId}>{selected.spaceId.split("/").at(-1)}</dd></div><div><dt>质量决策</dt><dd><ShieldCheck size={15} /> {selected.qualityDecision}</dd></div></dl>
+              {selectedEvidence === undefined ? null : <QueryExplanation evidence={selectedEvidence} />}
               <section className="detail-section"><h3><BookOpenText size={16} /> 正文</h3>{detailLoading ? <LoadingState label="读取已校验 Payload" /> : detailError !== undefined ? <div className="detail-read-error" role="alert"><AlertTriangle size={18} /><div><strong>正文读取失败</strong><p>{detailError.message}</p></div>{["revoked", "erased"].includes(selected.status) ? null : <Button onClick={() => void loadRevision(selected)} variant="secondary"><RefreshCw size={15} /> 重试</Button>}</div> : revision === undefined ? <p className="muted-copy">正文尚未载入。</p> : <pre className="content-preview detail-content">{revision.content}</pre>}</section>
+              <KnowledgeBoundary revision={revision} fallbackProvenance={selectedEvidence?.item.provenance} />
               <section className="detail-section"><h3><Quote size={16} /> 引用与义务</h3>{selectedEvidence === undefined ? <p className="muted-copy">通过检索打开此版本后可复制 Passage 引用并记录任务结果。</p> : <><div className="citation-detail"><strong>{selectedEvidence.item.citations.length} 个 Passage 引用</strong><span>{selectedEvidence.item.obligations.map((item) => String(item)).join(" · ") || "无额外义务"}</span><Button onClick={() => void copyCitation()} variant="secondary">{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "已复制" : "复制引用"}</Button></div>{selectedEvidence.item.citations.map((citation) => <blockquote key={citation.citationId}>{citation.quote ?? "该引用没有内联摘录。"}<small>{JSON.stringify(citation.locator)}</small></blockquote>)}</>}</section>
               <section className="detail-section"><h3><ShieldCheck size={16} /> 质量依据</h3>{selected.qualityReasons.map((reason) => <p className="reason-box" key={reason}>{reason}</p>)}<small className="attestation-line">Attestation：{selected.qualityAttestationRefs.map((ref) => shortId(ref, 24)).join(" · ")}</small></section>
               <section className="detail-section"><h3><GitBranch size={16} /> 后续动作</h3><div className="detail-actions"><Link className="button button-secondary" to={`/contribute?base=${encodeURIComponent(selected.revisionId)}&space=${encodeURIComponent(selected.spaceId)}`}>发起修订</Link>{selectedEvidence === undefined ? null : outcomeState === "saved" ? <span className="feedback-saved"><Check size={15} /> 任务结果已形成治理证据</span> : <><Button disabled={outcomeState === "saving"} onClick={() => void recordOutcome("helped")} variant="ghost"><ThumbsUp size={15} /> 有帮助</Button><Button disabled={outcomeState === "saving"} onClick={() => void recordOutcome("neutral")} variant="ghost">一般</Button><Button disabled={outcomeState === "saving"} onClick={() => void recordOutcome("harmed")} variant="danger"><ThumbsDown size={15} /> 有伤害</Button></>}</div></section>
@@ -365,5 +436,115 @@ function AssetRow({ asset, onOpen, selected }: { readonly asset: ConsoleAsset; r
 }
 
 function QueryRow({ item, onOpen, selected }: { readonly item: QueryResultItem; readonly onOpen: () => void; readonly selected: boolean }) {
-  return <button aria-pressed={selected} className={`knowledge-row query-row ${selected ? "knowledge-row-selected" : ""}`} onClick={onOpen}><span className="knowledge-icon knowledge-icon-ai"><Sparkles size={20} /></span><span className="knowledge-main"><span><strong>{item.title}</strong><span className="score-pill">相关性 {(item.scores[0]?.value ?? 0).toFixed(2)}</span></span><small>{item.summary ?? item.citations[0]?.quote ?? "暂无摘要"}</small><span className="citation-line"><Quote size={13} /> {item.citations.length} 个 Passage 引用 · {item.qualityDecision}</span></span><ChevronRight size={18} /></button>;
+  const sourceCount = item.provenance?.primarySources?.length ?? 0;
+  const status = item.statuses?.includes("deprecated") === true ? "deprecated" : "published";
+  return <button aria-pressed={selected} className={`knowledge-row query-row ${selected ? "knowledge-row-selected" : ""}`} onClick={onOpen}><span className="knowledge-icon knowledge-icon-ai"><Sparkles size={20} /></span><span className="knowledge-main"><span><strong>{item.title}</strong><StatusBadge status={status} /><span className="score-pill">本次排序分 {(item.scores[0]?.value ?? 0).toFixed(2)}</span></span><small>{item.summary ?? item.citations[0]?.quote ?? "暂无摘要"}</small><span className="result-facts"><i>{item.assetType}</i><i>{item.spaceId.split("/").at(-1)}</i><i>{qualityDecisionLabel(item.qualityDecision)}</i>{sourceCount > 0 ? <i>{sourceCount} 个来源</i> : null}</span><span className="citation-line"><Quote size={13} /> {item.citations.length} 个 Passage 引用 · {item.obligations.length} 项义务</span></span><ChevronRight size={18} /></button>;
+}
+
+function SearchEvidenceStrip({ session }: { readonly session: SearchSession }) {
+  return <div className="search-evidence-strip" role="status">
+    <span><ShieldCheck size={14} /><b>授权后检索</b></span>
+    <span>Space：{session.criteria.spaceId?.split("/").at(-1) ?? "Principal 允许范围"}</span>
+    <span>用途：customer-support</span>
+    <span>策略：{shortId(session.policyEpoch, 24)}</span>
+    <span>投影：{shortId(session.projectionGeneration, 28)}</span>
+    <span>索引截至：<time dateTime={session.indexedThrough}>{formatRelativeTime(session.indexedThrough)}</time></span>
+  </div>;
+}
+
+function QueryExplanation({ evidence }: { readonly evidence: DisplayedResult }) {
+  const item = evidence.item;
+  const score = item.scores[0];
+  return <section className="detail-section trust-explanation">
+    <h3><Sparkles size={16} /> 为什么返回这条知识</h3>
+    <p>它在当前授权 Space 和 purpose 内通过治理门禁，并由 Passage 检索进入本次排序；排序分只表示本次查询相关性，不代表知识可信度。</p>
+    <dl className="trust-grid">
+      <div><dt>召回方法</dt><dd>{score?.method ?? "未声明"}</dd></div>
+      <div><dt>本次排序分</dt><dd>{(score?.value ?? 0).toFixed(2)}</dd></div>
+      <div><dt>质量结论</dt><dd>{qualityDecisionLabel(item.qualityDecision)}</dd></div>
+      <div><dt>稳定引用</dt><dd>{item.citations.length} 个 Passage</dd></div>
+      <div><dt>策略水位</dt><dd>{shortId(evidence.policyEpoch, 24)}</dd></div>
+      <div><dt>曝光回执</dt><dd title={evidence.queryReceiptId}>{shortId(evidence.queryReceiptId, 24)}</dd></div>
+    </dl>
+  </section>;
+}
+
+function KnowledgeBoundary({
+  fallbackProvenance,
+  revision,
+}: {
+  readonly fallbackProvenance?: QueryResultItem["provenance"];
+  readonly revision?: RevisionDetail;
+}) {
+  const manifest = revision?.resource.manifest;
+  const provenance = manifest?.provenance ?? fallbackProvenance;
+  const sources = provenance?.primarySources ?? [];
+  const scope = manifest?.scope;
+  const policy = manifest?.policy;
+  if (revision === undefined && provenance === undefined) return null;
+  return <section className="detail-section knowledge-boundary">
+    <h3><GitBranch size={16} /> 来源与适用边界</h3>
+    <div className="boundary-grid">
+      <div>
+        <strong>主要来源</strong>
+        {sources.length === 0 ? <p className="muted-copy">未声明主要来源。</p> : <ul className="source-list">{sources.map((source) => <li key={source}>{safeHttpUrl(source) ? <a href={source} rel="noreferrer" target="_blank">{source}</a> : <span>{source}</span>}</li>)}</ul>}
+        {provenance?.generatedBy?.actor === undefined ? null : <p className="boundary-note">生成主体：{provenance.generatedBy.actor}</p>}
+      </div>
+      <dl className="scope-grid">
+        <div><dt>语言 / 地域</dt><dd>{[scope?.locale, scope?.jurisdiction].filter(Boolean).join(" · ") || "未限定"}</dd></div>
+        <div><dt>复审时间</dt><dd>{formatDate(scope?.reviewAfter)}</dd></div>
+        <div><dt>有效期</dt><dd>{formatValidity(scope?.validFrom, scope?.validUntil)}</dd></div>
+        <div><dt>允许用途</dt><dd>{policy?.allowedPurposes?.join(" · ") || "由本地策略决定"}</dd></div>
+        <div><dt>分类 / 导出</dt><dd>{[policy?.classification, policy?.export].filter(Boolean).join(" · ") || "未声明"}</dd></div>
+      </dl>
+    </div>
+    {scope?.assumptions === undefined || scope.assumptions.length === 0 ? null : <div className="assumption-list"><strong>适用假设</strong><ul>{scope.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul></div>}
+  </section>;
+}
+
+function assetFromQueryResult(evidence: DisplayedResult): ConsoleAsset {
+  const item = evidence.item;
+  return {
+    assetType: item.assetType,
+    indexedAt: evidence.indexedThrough,
+    labels: [],
+    obligations: item.obligations,
+    profile: item.profile ?? { digest: "", uri: "" },
+    qualityAttestationRefs: item.qualityAttestationRefs,
+    qualityDecision: item.qualityDecision === "suitable_with_warning"
+      ? "suitable_with_warning"
+      : "suitable",
+    qualityReasons: item.qualityReasons,
+    recordId: item.recordId,
+    revisionId: item.revisionId,
+    spaceId: item.spaceId,
+    status: item.statuses?.includes("deprecated") === true ? "deprecated" : "published",
+    ...(item.summary === undefined ? {} : { summary: item.summary }),
+    title: item.title,
+  };
+}
+
+function qualityDecisionLabel(value: string): string {
+  return value === "suitable_with_warning" ? "质量通过（有警告）" : "质量通过";
+}
+
+function safeHttpUrl(value: string): boolean {
+  try {
+    return ["http:", "https:"].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
+function formatDate(value: string | undefined): string {
+  if (value === undefined) return "未设置";
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed)
+    ? value
+    : new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium" }).format(new Date(parsed));
+}
+
+function formatValidity(from: string | undefined, until: string | undefined): string {
+  if (from === undefined && until === undefined) return "未限定";
+  return `${formatDate(from)} — ${formatDate(until)}`;
 }

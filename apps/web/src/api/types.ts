@@ -9,12 +9,48 @@ export type ContributionStatus =
   | "withdrawn";
 
 export interface Capability {
+  readonly auth: { readonly protectedResourceMetadata: string };
   readonly baseUrl: string;
   readonly expiresAt: string;
+  readonly limits: {
+    readonly idempotencyWindowSeconds: number;
+    readonly maxPageSize: number;
+    readonly maxPayloadBytes: number;
+  };
   readonly node: { readonly id: string; readonly name: string; readonly trustDomain?: string };
   readonly operations: readonly string[];
   readonly profiles: readonly string[];
+  readonly protocol: string;
+  readonly schemas: Readonly<Record<string, string>>;
+  readonly supportedExtensions: readonly { readonly required: boolean; readonly uri: string }[];
   readonly versions: readonly string[];
+}
+
+export interface KnowledgeProvenance {
+  readonly attributedTo?: readonly string[];
+  readonly generatedBy?: {
+    readonly actor?: string;
+    readonly endedAt?: string;
+    readonly type?: string;
+  };
+  readonly primarySources?: readonly string[];
+}
+
+export interface KnowledgeScope {
+  readonly assumptions?: readonly string[];
+  readonly jurisdiction?: string;
+  readonly locale?: string;
+  readonly reviewAfter?: string;
+  readonly validFrom?: string;
+  readonly validUntil?: string;
+}
+
+export interface KnowledgePolicy {
+  readonly allowedPurposes?: readonly string[];
+  readonly classification?: string;
+  readonly export?: string;
+  readonly obligations?: readonly unknown[];
+  readonly owners?: readonly string[];
 }
 
 export interface Overview {
@@ -114,23 +150,34 @@ export interface QueryResultItem {
     readonly payloadDigest: string;
     readonly quote?: string;
   }[];
+  readonly effectiveDecision?: "allowed" | "allowed_with_obligations";
   readonly obligations: readonly unknown[];
+  readonly profile?: { readonly digest: string; readonly uri: string };
+  readonly provenance?: KnowledgeProvenance;
   readonly qualityAttestationRefs: readonly string[];
   readonly qualityDecision: string;
   readonly qualityReasons: readonly string[];
   readonly recordId: string;
+  readonly relations?: readonly { readonly target: string; readonly type: string }[];
   readonly revisionId: string;
-  readonly scores: readonly { readonly method: string; readonly value: number }[];
+  readonly scores: readonly {
+    readonly backend?: string;
+    readonly method: string;
+    readonly metric?: string;
+    readonly profile?: string;
+    readonly value: number;
+  }[];
   readonly spaceId: string;
+  readonly statuses?: readonly "deprecated"[];
   readonly summary?: string;
   readonly title: string;
 }
 
 export interface QueryResponse {
-  readonly indexedThrough?: string;
+  readonly indexedThrough: string;
   readonly nextCursor?: string;
   readonly policyEpoch: string;
-  readonly projectionGeneration?: string;
+  readonly projectionGeneration: string;
   readonly queryReceiptId: string;
   readonly results: readonly QueryResultItem[];
   readonly snapshot: string;
@@ -138,12 +185,16 @@ export interface QueryResponse {
 
 export interface RevisionResource {
   readonly manifest: Record<string, any> & {
+    readonly policy?: KnowledgePolicy;
+    readonly profile?: { readonly digest: string; readonly uri: string };
+    readonly provenance?: KnowledgeProvenance;
     readonly payloads: readonly {
       readonly digest: string;
       readonly mediaType: string;
       readonly name: string;
       readonly size: number;
     }[];
+    readonly scope?: KnowledgeScope;
   };
   readonly revisionId: string;
 }
