@@ -50,6 +50,10 @@ WyJjaXRlIiwibm8tdHJhaW4iXQ
 该头只是调用方对本次请求的能力声明，服务端还会与 token 中可信的 `akep_obligations` claim
 取交集，不能通过请求头扩权。
 
+OIDC 试点 token 还必须包含签名 Tenant claim，默认名称为 `akep_tenant`，可通过
+`OIDC_TENANT_CLAIM` 配置。其值必须是与部署 `AKEP_TENANT_ID` 一致的绝对 URI；Tenant 不接受
+请求 header、path、query 或 body 指定。
+
 ## 3. 最小查询示例
 
 先完成 Web 首次引导以创建并发布一条示例知识；否则合法查询可能返回空结果。
@@ -80,6 +84,11 @@ curl --fail-with-body http://localhost:3000/akep/0.1/queries \
 
 当前 Core 只启用 `lexical` 和 `exact`。基础协议 Schema 中保留的 `semantic`、`hybrid` 在当前
 实例会返回 `AKEP_QUERY_MODE_UNSUPPORTED`，直到 discovery 明确声明支持。
+
+请求中的 `spaces` 只能缩小 token 的 Space scope；显式未授权 Space 返回 403。省略时使用
+Principal 的精确 Space 集合或 wildcard。Core 会在 Published 元数据读取和 PostgreSQL Passage
+排序/候选上限之前应用该集合；continuation cursor 同时绑定主体、Tenant、Space、purpose、
+obligation、scope 与 `policyEpoch`，不能跨身份或授权变化复用。
 
 Query/ContextPack/固定 Revision 读取会返回服务端签发的 Exposure Receipt。只有实际使用其中
 Citation 后才应提交 Usage，再用 Usage Receipt 提交 Feedback；客户端不能自造这条证据链。

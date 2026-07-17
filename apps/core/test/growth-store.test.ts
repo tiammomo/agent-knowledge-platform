@@ -58,6 +58,7 @@ describe("Space authorization", () => {
     subject: "test-subject",
     subjectDigest: "test-subject-digest",
     supportedObligations: [],
+    tenantId: "https://knowledge.test/tenants/test",
   });
 
   it("does not let an operation scope grant access to another Space", () => {

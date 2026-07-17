@@ -129,6 +129,7 @@ function asset(seed: string, content: string, warning = false): PublishedAsset {
 function growth(
   assets: readonly PublishedAsset[],
   expiredAttestations: ReadonlySet<string> = new Set(),
+  onListPublished?: (spaceIds: readonly string[] | undefined) => void,
 ): GrowthStore {
   return {
     async evidenceCounts() {
@@ -226,8 +227,11 @@ function growth(
     async listContributions() {
       return [];
     },
-    async listPublished() {
-      return assets;
+    async listPublished(spaceIds?: readonly string[]) {
+      onListPublished?.(spaceIds);
+      return spaceIds === undefined
+        ? assets
+        : assets.filter((candidate) => spaceIds.includes(candidate.spaceId));
     },
   } as unknown as GrowthStore;
 }
@@ -258,6 +262,7 @@ describe("passage query and context packs", () => {
       subject: "urn:akep:test:reader",
       subjectDigest: `sha256:${"f".repeat(64)}`,
       supportedObligations,
+      tenantId: config().tenantId,
     });
 
     expect(canConsume(
@@ -407,6 +412,70 @@ describe("passage query and context packs", () => {
     expect(response.json().results.map((item: { spaceId: string }) => item.spaceId)).toEqual(
       expect.arrayContaining([SPACE_ID, otherSpaceId]),
     );
+    await app.close();
+  });
+
+  it("pushes an explicit authorized Space into the published read model", async () => {
+    const support = asset("1", "退款超过 30 天时，需要主管复核。");
+    const operationsSpace = "https://knowledge.test/spaces/operations";
+    const base = asset("2", "退款超过 30 天，需要运营主管复核。");
+    const operations: PublishedAsset = {
+      ...base,
+      publicationEvent: { ...base.publicationEvent, spaceId: operationsSpace },
+      spaceId: operationsSpace,
+    };
+    let selectedSpaces: readonly string[] | undefined;
+    const app = await buildApplication({
+      config: config(),
+      growth: growth([support, operations], new Set(), (spaceIds) => {
+        selectedSpaces = spaceIds;
+      }),
+      logger: false,
+    });
+    const response = await app.inject({
+      headers: headers(),
+      method: "POST",
+      payload: query({ spaces: [SPACE_ID] }),
+      url: "/akep/0.1/queries",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(selectedSpaces).toEqual([SPACE_ID]);
+    expect(response.json().results.map((item: { spaceId: string }) => item.spaceId)).toEqual([
+      SPACE_ID,
+    ]);
+    await app.close();
+  });
+
+  it("binds continuation cursors to the authenticated Principal", async () => {
+    const assets = [
+      asset("1", "退款超过 30 天时，需要主管复核。"),
+      asset("2", "超过 30 天的退款，需要复核退款材料。"),
+    ];
+    const app = await buildApplication({
+      config: config(),
+      growth: growth(assets),
+      logger: false,
+    });
+    const first = await app.inject({
+      headers: headers(),
+      method: "POST",
+      payload: query({ limit: 1 }),
+      url: "/akep/0.1/queries",
+    });
+    const replay = await app.inject({
+      headers: {
+        ...headers(),
+        authorization: "Bearer dev-contributor",
+      },
+      method: "POST",
+      payload: query({ cursor: first.json().nextCursor, limit: 1 }),
+      url: "/akep/0.1/queries",
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(replay.statusCode).toBe(400);
+    expect(replay.json().code).toBe("AKEP_CURSOR_INVALID");
     await app.close();
   });
 

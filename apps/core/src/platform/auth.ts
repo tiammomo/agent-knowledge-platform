@@ -9,6 +9,7 @@ declare module "fastify" {
     akepAuthFailed?: boolean;
     akepAuthMode?: AuthMode;
     akepPrincipal?: Principal;
+    akepTenantId?: string;
   }
 }
 
@@ -17,12 +18,15 @@ export interface Principal {
   readonly subject: string;
   readonly subjectDigest: string;
   readonly supportedObligations: readonly unknown[];
+  readonly tenantId: string;
 }
 
-const DEVELOPMENT_TOKENS = new Map<string, Principal>([
+type UnboundPrincipal = Omit<Principal, "tenantId">;
+
+const DEVELOPMENT_TOKENS = new Map<string, UnboundPrincipal>([
   [
     "dev-reader",
-    createPrincipal(
+    createUnboundPrincipal(
       "urn:akep:development:reader",
       [
         "akep:classification:internal",
@@ -37,11 +41,11 @@ const DEVELOPMENT_TOKENS = new Map<string, Principal>([
   ],
   [
     "dev-observer",
-    createPrincipal("urn:akep:development:observer", ["akep:observe"]),
+    createUnboundPrincipal("urn:akep:development:observer", ["akep:observe"]),
   ],
   [
     "dev-contributor",
-    createPrincipal(
+    createUnboundPrincipal(
       "urn:akep:development:contributor",
       [
         "akep:classification:internal",
@@ -57,7 +61,7 @@ const DEVELOPMENT_TOKENS = new Map<string, Principal>([
   ],
   [
     "dev-console",
-    createPrincipal("urn:akep:development:console", [
+    createUnboundPrincipal("urn:akep:development:console", [
       "akep:classification:*",
       "akep:console",
       "akep:policy:*",
@@ -66,7 +70,7 @@ const DEVELOPMENT_TOKENS = new Map<string, Principal>([
   ],
   [
     "dev-curator",
-    createPrincipal("urn:akep:development:curator", [
+    createUnboundPrincipal("urn:akep:development:curator", [
       "akep:classification:internal",
       "akep:policy:*",
       "akep:read",
@@ -76,7 +80,7 @@ const DEVELOPMENT_TOKENS = new Map<string, Principal>([
   ],
   [
     "dev-evaluator",
-    createPrincipal("urn:akep:development:evaluator", [
+    createUnboundPrincipal("urn:akep:development:evaluator", [
       "akep:classification:internal",
       "akep:evaluate",
       "akep:policy:*",
@@ -86,7 +90,7 @@ const DEVELOPMENT_TOKENS = new Map<string, Principal>([
   ],
   [
     "dev-publisher",
-    createPrincipal("urn:akep:development:publisher", [
+    createUnboundPrincipal("urn:akep:development:publisher", [
       "akep:classification:internal",
       "akep:policy:*",
       "akep:publish",
@@ -96,7 +100,7 @@ const DEVELOPMENT_TOKENS = new Map<string, Principal>([
   ],
   [
     "dev-incident",
-    createPrincipal("urn:akep:development:incident", [
+    createUnboundPrincipal("urn:akep:development:incident", [
       "akep:classification:internal",
       "akep:incident",
       "akep:policy:*",
@@ -106,7 +110,7 @@ const DEVELOPMENT_TOKENS = new Map<string, Principal>([
   ],
   [
     "dev-eraser",
-    createPrincipal("urn:akep:development:eraser", [
+    createUnboundPrincipal("urn:akep:development:eraser", [
       "akep:classification:internal",
       "akep:erase",
       "akep:policy:*",
@@ -116,11 +120,11 @@ const DEVELOPMENT_TOKENS = new Map<string, Principal>([
   ],
 ]);
 
-function createPrincipal(
+function createUnboundPrincipal(
   subject: string,
   scopes: readonly string[],
   supportedObligations: readonly unknown[] = [],
-): Principal {
+): UnboundPrincipal {
   return {
     scopes: new Set(scopes),
     subject,
@@ -129,13 +133,19 @@ function createPrincipal(
   };
 }
 
+function bindTenant(principal: UnboundPrincipal, tenantId: string): Principal {
+  return { ...principal, tenantId };
+}
+
 export function installAuthentication(app: FastifyInstance, config: AppConfig): void {
   app.decorateRequest("akepAuthFailed", undefined);
   app.decorateRequest("akepAuthMode", undefined);
   app.decorateRequest("akepPrincipal", undefined);
+  app.decorateRequest("akepTenantId", undefined);
   if (config.authMode === "development") {
     app.addHook("onRequest", async (request) => {
       request.akepAuthMode = "development";
+      request.akepTenantId = config.tenantId;
     });
     return;
   }
@@ -148,6 +158,7 @@ export function installAuthentication(app: FastifyInstance, config: AppConfig): 
   });
   app.addHook("onRequest", async (request) => {
     request.akepAuthMode = "oidc";
+    request.akepTenantId = config.tenantId;
     const authorization = request.headers.authorization;
     if (authorization === undefined || !authorization.startsWith("Bearer ")) return;
     try {
@@ -195,15 +206,38 @@ export function installAuthentication(app: FastifyInstance, config: AppConfig): 
       const supportedObligations = parseTrustedObligations(
         verified.payload.akep_obligations,
       );
-      request.akepPrincipal = createPrincipal(
-        `urn:akep:principal:sha256:${identityDigest}`,
-        [...scopes],
-        supportedObligations,
+      const tenantId = parseTrustedTenant(
+        verified.payload[oidc.tenantClaim],
+        config.tenantId,
+      );
+      request.akepPrincipal = bindTenant(
+        createUnboundPrincipal(
+          `urn:akep:principal:sha256:${identityDigest}`,
+          [...scopes],
+          supportedObligations,
+        ),
+        tenantId,
       );
     } catch {
       request.akepAuthFailed = true;
     }
   });
+}
+
+function parseTrustedTenant(value: unknown, deploymentTenantId: string): string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 2_048) {
+    throw new Error("The signed tenant claim is missing or invalid");
+  }
+  let tenantId: string;
+  try {
+    tenantId = new URL(value).toString().replace(/\/$/u, "");
+  } catch {
+    throw new Error("The signed tenant claim is not an absolute URI");
+  }
+  if (tenantId !== deploymentTenantId) {
+    throw new Error("The signed tenant claim does not match this deployment");
+  }
+  return tenantId;
 }
 
 function parseTrustedObligations(value: unknown): readonly unknown[] {
@@ -272,7 +306,7 @@ export function authenticate(
   let principal: Principal | undefined;
   for (const [token, candidate] of DEVELOPMENT_TOKENS) {
     if (constantTimeTokenMatch(provided, token)) {
-      principal = candidate;
+      principal = bindTenant(candidate, requireDeploymentTenant(request));
       break;
     }
   }
@@ -312,7 +346,7 @@ export function authenticateAny(
   let principal: Principal | undefined;
   for (const [token, candidate] of DEVELOPMENT_TOKENS) {
     if (constantTimeTokenMatch(provided, token)) {
-      principal = candidate;
+      principal = bindTenant(candidate, requireDeploymentTenant(request));
       break;
     }
   }
@@ -338,7 +372,11 @@ function requireOidcPrincipal(
   requiredScopes: readonly string[],
 ): Principal {
   const principal = request.akepPrincipal;
-  if (request.akepAuthFailed === true || principal === undefined) {
+  if (
+    request.akepAuthFailed === true ||
+    principal === undefined ||
+    principal.tenantId !== request.akepTenantId
+  ) {
     throw new ProblemError(
       401,
       "AKEP_AUTHENTICATION_REQUIRED",
@@ -353,4 +391,15 @@ function requireOidcPrincipal(
     );
   }
   return principal;
+}
+
+function requireDeploymentTenant(request: FastifyRequest): string {
+  if (request.akepTenantId === undefined) {
+    throw new ProblemError(
+      401,
+      "AKEP_AUTHENTICATION_REQUIRED",
+      "The request is not bound to a trusted Tenant.",
+    );
+  }
+  return request.akepTenantId;
 }

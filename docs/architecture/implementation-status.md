@@ -26,11 +26,13 @@
 | Revision 身份 | 已验证 | TypeScript/Python RFC 8785 + SHA-256 黄金向量一致 |
 | 存储 | 可运行 | PostgreSQL 17、pgvector、不可变 Revision 触发器、检索投影、迁移摘要锁 |
 | Tenant 数据库边界 | 可运行 | 17 张租户事实表均有非空 `tenant_id`、租户复合约束和 `ENABLE/FORCE RLS`；Core/Migrator 连接绑定部署 Tenant；owner 管理数据库登录角色 → Tenant 绑定；production readiness 拒绝 owner、superuser、`BYPASSRLS` 和绑定不一致；集成测试覆盖跨 Tenant 读写、空上下文与伪造上下文拒绝 |
+| 可信单 Tenant Principal | 可运行 | OIDC token 必须携带可配置名称的签名 Tenant claim，其绝对 URI 与部署 Tenant 不一致、缺失或格式错误均 fail closed；请求 Principal、部署 Tenant 与数据库角色绑定形成三点一致性基线 |
+| Query Space 授权下推 | 可运行 | 本地 AuthorizationPlan 绑定 Tenant、subject、Space、purpose、obligation 与 policy epoch；精确 Space 集合在 Published 元数据读取以及 PostgreSQL 排序/50k 候选上限前过滤；游标绑定授权摘要，换主体重放失败 |
 | Evaluation / 质量门禁 | 可运行 | 发布精确执行 Profile `requiredAttestations`；Schema/静态安全扫描、Curator 审核和 Publisher 策略批准生成不可变证明；真实 EvaluationRun 可额外生成 benchmark 证明 |
 | Worker | 可运行 | Python JSONL 任务信封，规范化、确定性切片、静态敏感内容扫描、隔离判定、Manifest/Revision 校验；无数据库权限 |
 | SDK | 可运行 | TypeScript 与 Python 客户端覆盖 discovery、Query、ContextPack、固定 Revision、Usage/Feedback；TypeScript 另支持候选贡献 |
 | MCP Adapter | 可运行 | 独立 stdio 进程，暴露 search/context/get/usage/feedback/candidate；不持有治理发布能力 |
-| 生产认证基线 | 可运行 | OIDC Remote JWKS JWT 验证、issuer/audience/算法约束、RFC 9728 metadata；production 禁止开发令牌 |
+| 生产认证基线 | 可运行 | OIDC Remote JWKS JWT 验证、issuer/audience/算法/`typ`/寿命约束、签名 Tenant/obligation claim、RFC 9728 metadata；production 禁止开发令牌 |
 | 可观测性基线 | 可运行 | Trace Context、可选 OTLP/HTTP trace、受保护 Prometheus 指标、p50/p95/error-rate/SLO 健康视图 |
 | Web Console | 可运行 | React 19 + TypeScript + Vite；八个响应式产品页面，全部读取真实 API 状态 |
 | 新手引导 | 可运行 | 五步可恢复向导，真实执行 discovery → candidate → review → publish → query |
@@ -44,16 +46,16 @@
 擦除仍需要生产对象存储、密钥销毁和 erase proof，因此试点动作不能冒充完整法务擦除证明。
 
 Web Console 是开发基线而非生产管理面：浏览器内置的 `dev-*` token 只用于本地角色演示。
-生产身份验证、数据库 Tenant 纵深防御与基础观测已经落地，但仍需完成下面的动态租户、策略、
-存储和运维门禁；不能将
+生产身份验证、固定 Tenant Principal、Query Space 前置过滤、数据库 Tenant 纵深防御与基础观测
+已经落地，但仍需完成下面的动态租户、外部策略、存储和运维门禁；不能将
 开发镜像或浏览器内置的 `dev-*` token 直接暴露到公网。
 
 ## 有意关闭
 
 | 能力 | 原因 / 启用门槛 |
 | --- | --- |
-| 外部 PDP 与 Space 授权下推 | 当前仍是固定治理 floor + 应用层 Space 检查；必须完成策略编译、AuthorizationPlan 绑定、`ORDER BY/LIMIT` 前下推和 TOCTOU 复核 |
-| 共享多租户 Principal 与全链路隔离 | 当前 Tenant 由进程配置固定，数据库 Tenant/RLS 已落地；仍须完成可信 Principal → Tenant 映射、事务级动态上下文、对象/缓存/队列/日志隔离和完整侧信道测试 |
+| 外部 PDP 与完整策略下推 | 本地 Query AuthorizationPlan、Space 前置过滤与精确读取复核已落地；仍须接入可审计 PDP，把 classification/resource policy 等谓词编译到所有检索适配器，补齐检索 TOCTOU 复核并持久化单调策略水位 |
+| 共享多租户 Principal 与全链路隔离 | 固定部署模式已要求签名 Principal Tenant，数据库 Tenant/RLS 已落地；仍须完成控制面 issuer/client → Tenant 映射、每事务动态上下文、对象/缓存/队列/日志隔离和完整统计侧信道测试 |
 | Integration / Connector 控制面 | 当前可人工注册 OIDC client 并使用 REST/SDK/MCP；自助 Integration Registry、Connector runtime、checkpoint、配额/停用尚未实现 |
 | 持续维护调度 | 已有 `reviewAfter`、Attestation、Feedback 和生命周期动作；Owner 目录、due/conflict queue、通知/SLA、来源 checkpoint 尚未实现 |
 | 对象存储与外部接入扫描 | Worker 已有规范化、确定性切片和静态隔离判定；仍须提供对象隔离区、独立恶意文件扫描、媒体解析沙箱和摘要提交协议 |
@@ -70,8 +72,8 @@ Web Console 是开发基线而非生产管理面：浏览器内置的 `dev-*` to
 
 1. 用真实 Identity Provider、短期 audience-bound token 和轮换演练替换全部 `dev-*` 身份，保留 Contributor、Curator、Publisher、Incident、Eraser 的职责分离。
 2. 将内联 Payload 迁移到加密对象存储，接入扫描、配额、保留与擦除证明。
-3. 在现有全表 RLS 之上完成动态 Principal Tenant 与 Space/PDP 授权下推；策略必须在召回和
-   `LIMIT` 之前生效，并完成连接池、唯一约束和统计侧信道验收。
+3. 在现有签名 Tenant Principal、全表 RLS 与 Query Space 前置过滤之上，完成控制面身份映射、
+   每事务动态 Tenant、外部 PDP 与完整策略谓词下推，并完成连接池、唯一约束和统计侧信道验收。
 4. 将现有 OTLP/Prometheus 基线接入高可用 Collector、长期指标、审计安全日志、备份恢复、密钥轮换、告警和故障演练。
 5. 用威胁样本、权限矩阵、撤销传播、迁移回滚和容量压测完成独立验收。
 6. 落地 Integration/Connector 生命周期和知识 Owner/维护策略/due queue，完成接入停用与

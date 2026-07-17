@@ -16,6 +16,7 @@ import type { AttestationState } from "../src/modules/evaluation/types.js";
 import { registerGrowthRoutes } from "../src/modules/growth/routes.js";
 import { InMemoryGrowthStore } from "../src/modules/growth/store.js";
 import { InMemoryExposureReceiptStore } from "../src/modules/query/exposure-receipt-store.js";
+import { installAuthentication } from "../src/platform/auth.js";
 import { installErrorHandling } from "../src/platform/problem.js";
 
 const apps: ReturnType<typeof Fastify>[] = [];
@@ -73,6 +74,7 @@ describe("evaluation evidence and publication quality gate", () => {
     const app = Fastify({ logger: false });
     apps.push(app);
     installErrorHandling(app);
+    installAuthentication(app, appConfig);
     await app.register(
       async (api) => {
         await registerEvaluationRoutes(api, { config: appConfig, contracts, growth });

@@ -5,13 +5,14 @@
 - 架构前置：[外部系统接入设计](../architecture/external-integration.md)
 
 本手册用于把一个外部业务系统或 Agent Host 安全接入知识平台。当前参考实现没有自助 Integration
-Registry，OIDC client、Tenant/Space 映射、配额和审批仍需平台管理员在 IdP/部署配置中完成。
+Registry，OIDC client、Space scope、配额和审批仍需平台管理员在 IdP/部署配置中完成；Tenant
+使用签名 claim 与单个部署 Tenant 做严格一致性绑定。
 
 > [!WARNING]
 > 当前 Core 的 Tenant 由整个进程的 `AKEP_TENANT_ID` 固定，不支持按 client 映射多个 Tenant。
-> 数据库全表 Tenant RLS 已作为第二道防线，但一个试点实例仍只能承载一个受控 Tenant；可信
-> 多租户 Principal、动态事务上下文和全链路隔离验收完成前，不得把互不信任团队接到同一实例。
-> 下文的跨 Tenant HTTP/Space/侧信道测试仍属于目标多租户门禁。
+> OIDC token 必须携带与它一致的签名 Tenant claim，数据库全表 Tenant RLS 作为第二道防线；但
+> 一个试点实例仍只能承载一个受控 Tenant。控制面多租户映射、动态事务上下文和全链路隔离验收
+> 完成前，不得把互不信任 Tenant 接到同一实例。下文的跨 Tenant/统计侧信道测试仍属于目标门禁。
 
 ## 1. 接入申请
 
@@ -37,9 +38,11 @@ Registry，OIDC client、Tenant/Space 映射、配额和审批仍需平台管理
 
 1. 在 IdP 注册 workload client，使用短期 access token；生产优先 private_key_jwt/mTLS。
 2. 固定 audience/resource 为 AKEP Base URL。
-3. 当前确认该 client 只访问本实例固定 Tenant；目标态再由控制面把 issuer + client 映射到唯一
-   Tenant 和 Integration Owner。
-4. 只发所需 scope、Space、classification、policy 和可信 `akep_obligations`。
+3. 当前确认该 client 只访问本实例固定 Tenant；在签名 `akep_tenant`（或部署配置的
+   `OIDC_TENANT_CLAIM`）中发放与 `AKEP_TENANT_ID` 完全一致的绝对 URI。目标态再由控制面把
+   issuer + client 映射到唯一 Tenant 和 Integration Owner。
+4. 只发所需 scope、Space、classification、policy 和可信 `akep_obligations`；不得接受客户端
+   header、path、query 或 body 自报 Tenant。
 5. 设置 token 最大寿命、密钥轮换、速率/并发/字节配额和停用日期。
 6. 记录审批、配置版本、测试 Space 和事故联系人。
 
@@ -63,7 +66,8 @@ curl --fail https://knowledge.example.com/.well-known/oauth-protected-resource
 必须验证：
 
 - 无 token、错误 issuer/audience/`typ`/算法、过期或寿命过长 token 拒绝。
-- 错误 Tenant/Space、缺 scope、错误 purpose、不能履行 obligation 拒绝。
+- 缺失、格式错误或不匹配的签名 Tenant claim，错误 Space、缺 scope、错误 purpose、不能履行
+  obligation 均拒绝。
 - Integration 被停用/Group 移除后旧 token/Receipt/cache fail closed。
 - 已知其他 Space 的 Record/Revision/Blob/Receipt ID 不可读取。
 
@@ -77,6 +81,7 @@ curl --fail https://knowledge.example.com/.well-known/oauth-protected-resource
 验证响应：
 
 - 只包含授权 Space 的 Published Revision。
+- 使用另一主体重放 continuation cursor 会失败；未授权 Space 不影响授权结果集和排名。
 - Citation 固定 `revisionId + payloadDigest + locator`。
 - Exposure Receipt 存在、未过期并绑定同一 purpose/subject/Space。
 - 零结果是正常响应，不改用更高权限 token 猜测内容存在性。

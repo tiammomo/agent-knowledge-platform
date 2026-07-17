@@ -125,8 +125,9 @@ SDK 详细用法见 [TypeScript](../../packages/sdk-ts/README.md) 与
 `akep_obligations` claim 发放。
 
 如需在本地验证 OIDC 启动配置，将 `AUTH_MODE=oidc` 并设置 `OIDC_ISSUER`、
-`OIDC_AUDIENCE`、`OIDC_JWKS_URI`；此时所有 `dev-*` token 都会失效。完整的隔离试点配置与
-观测端点见[生产试点运行手册](production-pilot.md)。
+`OIDC_AUDIENCE`、`OIDC_JWKS_URI`、`AKEP_TENANT_ID`；token 必须在签名 `akep_tenant`
+claim（可由 `OIDC_TENANT_CLAIM` 改名）中携带相同的绝对 URI。此时所有 `dev-*` token 都会
+失效。完整的隔离试点配置与观测端点见[生产试点运行手册](production-pilot.md)。
 
 ## 验证
 

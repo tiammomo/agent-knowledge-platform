@@ -10,6 +10,7 @@ export interface OidcConfig {
   readonly issuer: string;
   readonly jwksUri: string;
   readonly maxTokenLifetimeSeconds: number;
+  readonly tenantClaim: string;
 }
 
 export interface AppConfig {
@@ -88,6 +89,14 @@ function parseTokenTypes(value: string | undefined): readonly string[] {
   return [...new Set(types)];
 }
 
+function parseClaimName(value: string | undefined): string {
+  const claim = value?.trim() || "akep_tenant";
+  if (claim.length > 256 || /[\s\u0000-\u001f"\\]/u.test(claim)) {
+    throw new Error("OIDC_TENANT_CLAIM must be a valid JWT claim name");
+  }
+  return claim;
+}
+
 function findWorkspaceRoot(start: string): string {
   let current = resolve(start);
   for (;;) {
@@ -151,6 +160,7 @@ export function loadConfig(
           env.OIDC_MAX_TOKEN_LIFETIME_SECONDS,
           3_600,
         ),
+        tenantClaim: parseClaimName(env.OIDC_TENANT_CLAIM),
       }
     : undefined;
   if (
@@ -208,6 +218,7 @@ export function loadConfig(
             issuer: requireExactUri("OIDC_ISSUER", oidc.issuer),
             jwksUri: requireExactUri("OIDC_JWKS_URI", oidc.jwksUri),
             maxTokenLifetimeSeconds: oidc.maxTokenLifetimeSeconds,
+            tenantClaim: oidc.tenantClaim,
           },
         }),
     ...(otelTracesEndpoint === undefined || otelTracesEndpoint.length === 0

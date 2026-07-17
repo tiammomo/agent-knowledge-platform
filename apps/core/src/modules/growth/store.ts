@@ -112,7 +112,7 @@ export interface GrowthStore {
   getWorkflowMutation(
     key: WorkflowMutationKey,
   ): Promise<WorkflowMutationLookup>;
-  listPublished(): Promise<readonly PublishedAsset[]>;
+  listPublished(spaceIds?: readonly string[]): Promise<readonly PublishedAsset[]>;
   listContributions(): Promise<readonly ContributionState[]>;
   evidenceCounts(): Promise<{ readonly feedback: number; readonly usage: number }>;
   evidenceSummary(): Promise<EvidenceSummary>;
@@ -380,8 +380,13 @@ export class InMemoryGrowthStore implements GrowthStore {
       : { kind: "conflict" };
   }
 
-  public async listPublished(): Promise<readonly PublishedAsset[]> {
-    return [...this.#published.values()];
+  public async listPublished(
+    spaceIds?: readonly string[],
+  ): Promise<readonly PublishedAsset[]> {
+    const published = [...this.#published.values()];
+    return spaceIds === undefined
+      ? published
+      : published.filter((asset) => spaceIds.includes(asset.spaceId));
   }
 
   public async listContributions(): Promise<readonly ContributionState[]> {
@@ -968,7 +973,10 @@ export class PostgresGrowthStore implements GrowthStore {
     });
   }
 
-  public async listPublished(): Promise<readonly PublishedAsset[]> {
+  public async listPublished(
+    spaceIds?: readonly string[],
+  ): Promise<readonly PublishedAsset[]> {
+    if (spaceIds?.length === 0) return [];
     const result = await this.pool.query(
       `select p.*, e.document as publication_document,
               s.document as status_document
@@ -984,8 +992,9 @@ export class PostgresGrowthStore implements GrowthStore {
               and rs.revision_id = p.revision_id
             order by rs.asserted_at desc limit 1
          ) s on true
-        where p.tenant_id = $1`,
-      [this.config.tenantId],
+        where p.tenant_id = $1
+          and ($2::text[] is null or p.space_id = any($2::text[]))`,
+      [this.config.tenantId, spaceIds ?? null],
     );
     return result.rows.map(publishedFromRow);
   }

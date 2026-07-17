@@ -213,6 +213,14 @@ integration("PostgreSQL integration", () => {
       expect(
         persisted.rows.filter(({ status }) => status === "published"),
       ).toHaveLength(1);
+
+      const authorizedProjection = await store.listPublished([spaceId]);
+      const deniedProjection = await store.listPublished([
+        "https://knowledge.test/spaces/not-authorized",
+      ]);
+      expect(authorizedProjection).toHaveLength(2);
+      expect(authorizedProjection.every((asset) => asset.spaceId === spaceId)).toBe(true);
+      expect(deniedProjection).toEqual([]);
     } finally {
       await pool.end();
     }

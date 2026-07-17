@@ -266,9 +266,15 @@ export function knowledgeSnapshot(
   return `opaque:sha256:${hash(canonicalJson(projection))}`;
 }
 
-export function queryFingerprint(body: Record<string, unknown>): string {
+export function queryFingerprint(
+  body: Record<string, unknown>,
+  authorizationBinding?: string,
+): string {
   const { cursor: _cursor, limit: _limit, ...stable } = body;
-  return `sha256:${hash(canonicalJson(stable))}`;
+  return `sha256:${hash(canonicalJson({
+    authorizationBinding: authorizationBinding ?? null,
+    query: stable,
+  }))}`;
 }
 
 export function encodeCursor(input: {

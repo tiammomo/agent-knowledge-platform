@@ -279,6 +279,7 @@ describe("AKEP bootstrap reader", () => {
 
     expect(config.oidc?.accessTokenTypes).toEqual(["at+jwt", "JWT"]);
     expect(config.oidc?.maxTokenLifetimeSeconds).toBe(3_600);
+    expect(config.oidc?.tenantClaim).toBe("akep_tenant");
   });
 
   it("validates the OIDC token-type allowlist and maximum lifetime", () => {
@@ -297,17 +298,23 @@ describe("AKEP bootstrap reader", () => {
       { ...base, OIDC_MAX_TOKEN_LIFETIME_SECONDS: "3600seconds" },
       import.meta.url,
     )).toThrow("OIDC_MAX_TOKEN_LIFETIME_SECONDS must be a positive integer");
+    expect(() => loadConfig(
+      { ...base, OIDC_TENANT_CLAIM: "invalid claim" },
+      import.meta.url,
+    )).toThrow("OIDC_TENANT_CLAIM");
 
     const config = loadConfig(
       {
         ...base,
         OIDC_ACCESS_TOKEN_TYPES: "at+jwt,custom+jwt,at+jwt",
         OIDC_MAX_TOKEN_LIFETIME_SECONDS: "900",
+        OIDC_TENANT_CLAIM: "https://claims.test/tenant",
       },
       import.meta.url,
     );
     expect(config.oidc?.accessTokenTypes).toEqual(["at+jwt", "custom+jwt"]);
     expect(config.oidc?.maxTokenLifetimeSeconds).toBe(900);
+    expect(config.oidc?.tenantClaim).toBe("https://claims.test/tenant");
   });
 
   it("requires HTTPS origins and identity metadata in production", () => {

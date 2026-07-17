@@ -83,13 +83,14 @@ Console 的任务不是把数据库表包装成管理后台，而是让用户看
 Console API 返回私有展示投影：资产列表不返回 Payload 字节；贡献工作台会向具有
 contribute/review/publish scope 的开发身份返回候选 inline Payload，以支持正文预览与差异审核。
 所有响应使用 `private, no-store`，并执行贡献所有权、Space 与职责 scope 授权；数据库 Tenant
-RLS 已作为第二道防线。多租户生产前还必须完成可信动态 Tenant、外部 PDP、分类/策略字段级
-脱敏，不能把当前开发投影直接开放给普通 Contributor。Nginx 统一 Origin，设置 CSP、禁止
-frame 嵌入并关闭相机、麦克风和定位权限。
+RLS 已作为第二道防线；固定部署 OIDC Principal 也必须携带匹配的签名 Tenant，Query Space 已在
+元数据读取和检索排序/上限前过滤。多租户生产前还必须完成控制面动态 Tenant、外部 PDP、
+分类/策略字段级脱敏，不能把当前开发投影直接开放给普通 Contributor。Nginx 统一 Origin，设置
+CSP、禁止 frame 嵌入并关闭相机、麦克风和定位权限。
 
 当前浏览器 bundle 中的多个 `dev-*` token 是明确的本地开发机制。上线前必须替换为 OIDC/OAuth
-登录和短期会话，并在现有固定 Tenant RLS 上完成动态 Principal Tenant、外部 PDP、
-CSRF/会话防护、审计导出及高权限二次确认。
+登录和短期会话，并在现有签名 Tenant Principal 与固定 Tenant RLS 上完成控制面动态 Tenant、
+外部 PDP/完整策略下推、CSRF/会话防护、审计导出及高权限二次确认。
 
 ## 验收方式
 

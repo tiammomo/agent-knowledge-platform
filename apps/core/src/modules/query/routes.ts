@@ -15,6 +15,7 @@ import {
   type SupportedProfile,
 } from "../growth/validation.js";
 import { authenticate, type Principal } from "../../platform/auth.js";
+import { authorizeQuery } from "../../platform/authorization.js";
 import {
   requireAKEPVersion,
   requireObligationSupport,
@@ -79,10 +80,21 @@ export async function registerQueryRoutes(
         "This node does not yet support minimum federation checkpoints.",
       );
     }
-    const published = await growth.listPublished();
-    const spaces = (body.spaces as readonly string[] | undefined) ??
-      authorizedSpaceIds(published, principal, config.defaultSpaceId);
     const purpose = body.purpose as string;
+    const authorization = authorizeQuery({
+      config,
+      principal,
+      purpose,
+      ...(body.spaces === undefined
+        ? {}
+        : { requestedSpaceIds: body.spaces as readonly string[] }),
+    });
+    const published = await growth.listPublished(authorization.spaceIds);
+    const spaces = effectiveSpaceIds(
+      authorization.spaceIds,
+      published,
+      config.defaultSpaceId,
+    );
     const supportedObligations = body.supportedObligations as readonly unknown[];
     const limit = body.limit as number;
     const assets = await authorizedAssets(
@@ -99,7 +111,7 @@ export async function registerQueryRoutes(
       assets,
       `${config.policyEpoch}:${search.projectionGeneration}`,
     );
-    const fingerprint = queryFingerprint(body);
+    const fingerprint = queryFingerprint(body, authorization.bindingDigest);
     const offset = continuationOffset(body.cursor, fingerprint, snapshot);
     const query = body.query as {
       readonly locale?: string;
@@ -145,6 +157,7 @@ export async function registerQueryRoutes(
       kind: "query",
       obligations,
       principal,
+      policyDecisionId: authorization.decisionId,
       purpose,
       spaces,
       issuedAt,
@@ -183,9 +196,20 @@ export async function registerQueryRoutes(
     requireNoCritical(context);
     requireImplementedMode(context.mode);
     requireImplementedFilters(context.filters);
-    const published = await growth.listPublished();
-    const spaces = context.spaces ??
-      authorizedSpaceIds(published, principal, config.defaultSpaceId);
+    const authorization = authorizeQuery({
+      config,
+      principal,
+      purpose: context.purpose,
+      ...(context.spaces === undefined
+        ? {}
+        : { requestedSpaceIds: context.spaces }),
+    });
+    const published = await growth.listPublished(authorization.spaceIds);
+    const spaces = effectiveSpaceIds(
+      authorization.spaceIds,
+      published,
+      config.defaultSpaceId,
+    );
     const queryBody: Record<string, unknown> = {
       critical: context.critical,
       ...(context.filters === undefined ? {} : { filters: context.filters }),
@@ -237,6 +261,7 @@ export async function registerQueryRoutes(
       kind: "query",
       obligations,
       principal,
+      policyDecisionId: authorization.decisionId,
       purpose: context.purpose,
       spaces,
     });
@@ -372,7 +397,10 @@ export async function registerQueryRoutes(
     "/spaces/:spaceId/records/:recordId",
     async (request, reply) => {
       const context = verifyDirectReadHeaders(request, contracts);
-      const candidates = (await growth.listPublished()).filter(
+      if (!hasSpaceAccess(context.principal, request.params.spaceId)) {
+        throw notFound("The record was not found.");
+      }
+      const candidates = (await growth.listPublished([request.params.spaceId])).filter(
           (asset) =>
             asset.spaceId === request.params.spaceId &&
             asset.manifest.recordId === request.params.recordId &&
@@ -699,29 +727,21 @@ function parseContextPackRequest(
   };
 }
 
-function authorizedSpaceIds(
+function effectiveSpaceIds(
+  authorizedSpaceIds: readonly string[] | undefined,
   published: readonly PublishedAsset[],
-  principal: Principal,
   defaultSpaceId: string,
 ): readonly string[] {
-  const visible = uniqueStrings(
-    published.map((asset) => asset.spaceId).filter((spaceId) =>
-      hasSpaceAccess(principal, spaceId),
-    ),
-  );
-  if (visible.length > 0) return visible;
-
-  const exact = [...principal.scopes]
-    .filter((scope) => scope.startsWith("akep:space:") && scope !== "akep:space:*")
-    .flatMap((scope) => {
-      try {
-        return [decodeURIComponent(scope.slice("akep:space:".length))];
-      } catch {
-        return [];
-      }
-    });
-  if (exact.length > 0) return uniqueStrings(exact);
-  return [defaultSpaceId];
+  if (authorizedSpaceIds !== undefined) return authorizedSpaceIds;
+  const visible = uniqueStrings(published.map((asset) => asset.spaceId));
+  if (visible.length > 100) {
+    throw new ProblemError(
+      422,
+      "AKEP_QUERY_SCOPE_TOO_BROAD",
+      "Select at most 100 authorized Spaces explicitly for this query.",
+    );
+  }
+  return visible.length === 0 ? [defaultSpaceId] : visible;
 }
 
 function selectContextPassages(
@@ -1000,6 +1020,9 @@ async function authorizedAsset(
   context: DirectReadContext,
   profiles: ReadonlyMap<string, SupportedProfile>,
 ): Promise<PublishedAsset> {
+  if (!hasSpaceAccess(context.principal, spaceId)) {
+    throw notFound("The revision was not found.");
+  }
   const asset = await growth.getPublishedRevision(spaceId, revisionId);
   if (
     asset === undefined ||
@@ -1070,6 +1093,7 @@ function createExposureReceipt(input: {
   readonly issuedAt: Date;
   readonly kind: ExposureReceipt["kind"];
   readonly obligations: readonly unknown[];
+  readonly policyDecisionId?: string;
   readonly principal: Principal;
   readonly purpose: string;
   readonly spaces: readonly string[];
@@ -1082,7 +1106,7 @@ function createExposureReceipt(input: {
     issuedAt: input.issuedAt.toISOString(),
     kind: input.kind,
     obligations: input.obligations,
-    policyDecisionId: `urn:uuid:${randomUUID()}`,
+    policyDecisionId: input.policyDecisionId ?? `urn:uuid:${randomUUID()}`,
     policyEpoch: input.config.policyEpoch,
     purpose: input.purpose,
     spaceIds: input.spaces,
@@ -1195,6 +1219,7 @@ async function citationsAreCurrent(
   for (const item of citations) {
     const citation = item as { readonly revisionId?: string; readonly spaceId?: string };
     if (citation.revisionId === undefined || citation.spaceId === undefined) return false;
+    if (!hasSpaceAccess(principal, citation.spaceId)) return false;
     const asset = await growth.getPublishedRevision(citation.spaceId, citation.revisionId);
     if (
       asset === undefined ||

@@ -13,12 +13,14 @@ import { loadConfig } from "../src/config.js";
 import { authenticate, installAuthentication } from "../src/platform/auth.js";
 
 const AUDIENCE = "https://knowledge.test/akep/0.1";
+const TENANT_ID = "https://knowledge.test/tenants/acme";
 
 interface TokenOptions {
   readonly claims?: Record<string, unknown>;
   readonly expiresAt?: number | null;
   readonly issuedAt?: number | null;
   readonly subject?: string | null;
+  readonly tenant?: string | null;
   readonly type?: string | null;
 }
 
@@ -53,6 +55,7 @@ describe("OIDC access-token trust boundary", () => {
 
     const config = loadConfig(
       {
+        AKEP_TENANT_ID: TENANT_ID,
         AUTH_MODE: "oidc",
         DATABASE_REQUIRED: "false",
         NODE_ENV: "test",
@@ -61,6 +64,7 @@ describe("OIDC access-token trust boundary", () => {
         OIDC_ISSUER: issuer,
         OIDC_JWKS_URI: `${origin}/jwks.json`,
         OIDC_MAX_TOKEN_LIFETIME_SECONDS: "300",
+        OIDC_TENANT_CLAIM: "akep_tenant",
       },
       import.meta.url,
     );
@@ -72,6 +76,7 @@ describe("OIDC access-token trust boundary", () => {
         return reply.send({
           subject: principal.subject,
           supportedObligations: principal.supportedObligations,
+          tenantId: principal.tenantId,
         });
       } catch {
         return reply.code(401).send({ code: "denied" });
@@ -91,6 +96,9 @@ describe("OIDC access-token trust boundary", () => {
     const now = Math.floor(Date.now() / 1_000);
     const token = new SignJWT({
       scope: "akep:read",
+      ...(options.tenant === null
+        ? {}
+        : { akep_tenant: options.tenant ?? TENANT_ID }),
       ...(options.claims ?? {}),
     })
       .setProtectedHeader({
@@ -122,7 +130,16 @@ describe("OIDC access-token trust boundary", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       supportedObligations: ["cite", "no-train"],
+      tenantId: TENANT_ID,
     });
+  });
+
+  it("requires a signed Tenant claim matching the deployment", async () => {
+    expect((await request(await sign({ tenant: null }))).statusCode).toBe(401);
+    expect((await request(await sign({
+      tenant: "https://knowledge.test/tenants/other",
+    }))).statusCode).toBe(401);
+    expect((await request(await sign({ tenant: "not-a-uri" }))).statusCode).toBe(401);
   });
 
   it("requires sub, iat and exp", async () => {
