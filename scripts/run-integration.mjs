@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,10 +7,11 @@ const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const defaultDatabaseUrl =
   "postgres://akep:akep-local-only@localhost:5432/akep";
 const suppliedDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
-const databaseUrl = suppliedDatabaseUrl || defaultDatabaseUrl;
+let databaseUrl = suppliedDatabaseUrl || defaultDatabaseUrl;
 const manageComposeDatabase = suppliedDatabaseUrl === undefined || suppliedDatabaseUrl.length === 0;
 const keepDatabase = process.env.AKEP_KEEP_TEST_DATABASE === "true";
 let startedPostgres = false;
+let disposableDatabaseName = null;
 
 try {
   if (manageComposeDatabase) {
@@ -22,6 +24,20 @@ try {
     ]);
     startedPostgres = !runningServices.split(/\r?\n/u).includes("postgres");
     await run("docker", ["compose", "up", "-d", "postgres", "--wait"]);
+    disposableDatabaseName = `akep_test_${randomUUID().replaceAll("-", "")}`;
+    await run("docker", [
+      "compose",
+      "exec",
+      "-T",
+      "postgres",
+      "createdb",
+      "--username",
+      "akep",
+      disposableDatabaseName,
+    ]);
+    const isolatedUrl = new URL(defaultDatabaseUrl);
+    isolatedUrl.pathname = `/${disposableDatabaseName}`;
+    databaseUrl = isolatedUrl.toString();
   }
 
   await run(
@@ -35,6 +51,21 @@ try {
     { TEST_DATABASE_URL: databaseUrl },
   );
 } finally {
+  if (disposableDatabaseName !== null && !keepDatabase) {
+    await run("docker", [
+      "compose",
+      "exec",
+      "-T",
+      "postgres",
+      "dropdb",
+      "--force",
+      "--username",
+      "akep",
+      disposableDatabaseName,
+    ], {}, false);
+  } else if (disposableDatabaseName !== null) {
+    process.stderr.write(`[integration] retained isolated database ${disposableDatabaseName}\n`);
+  }
   if (startedPostgres && !keepDatabase) {
     await run("docker", ["compose", "stop", "postgres"], {}, false);
   }
