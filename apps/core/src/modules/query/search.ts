@@ -14,9 +14,40 @@ const CHUNK_MAX_BYTES = 1_600;
 const CHUNK_MIN_BOUNDARY_BYTES = 960;
 const CHUNK_OVERLAP_BYTES = 160;
 const MAX_DATABASE_CANDIDATES = 50_000;
+const MIN_LEXICAL_TERM_COVERAGE = 0.3;
 
 export const CHUNKER_FINGERPRINT = "akep-utf8-passage-v1";
-export const LEXICAL_RANKER_FINGERPRINT = "akep-lexical-v2";
+export const LEXICAL_RANKER_FINGERPRINT = "akep-lexical-v4";
+
+// Query wrappers are common in agent traffic but carry no retrieval intent. Keeping
+// them in the coverage denominator made a relevant Chinese query disappear merely
+// because a caller added polite or evaluation-oriented framing.
+const LEXICAL_STOP_TERMS = new Set([
+  "直接",
+  "处理",
+  "以下",
+  "请求",
+  "这是",
+  "独立",
+  "验收",
+  "样本",
+  "保持",
+  "原意",
+  "应该",
+  "如何",
+  "严格",
+  "保留",
+  "原文",
+  "中的",
+  "作为",
+  "正式",
+  "回归",
+  "用例",
+  "完成",
+  "前提",
+  "当前",
+  "执行",
+]);
 
 interface StoredPassageRow {
   readonly chunk_id: string;
@@ -94,10 +125,11 @@ export class PostgresQuerySearchStore implements QuerySearchStore {
             or
             ($4::text is null and $5 = 'lexical' and (
               strpos(c.search_normalized, $6) > 0
-              or not exists (
-                select 1 from unnest($7::text[]) as term
-                 where strpos(c.search_normalized, term) = 0
-              )
+              or (
+                select count(*)::double precision
+                  from unnest($7::text[]) as term
+                 where strpos(c.search_normalized, term) > 0
+              ) / greatest(cardinality($7::text[]), 1) >= $8
             ))
           )
         order by
@@ -105,7 +137,7 @@ export class PostgresQuerySearchStore implements QuerySearchStore {
           similarity(c.search_normalized, $6) desc,
           octet_length(c.content),
           c.revision_id, c.payload_digest, c.start_offset
-        limit $8`,
+        limit $9`,
       [
         this.config.tenantId,
         JSON.stringify(allowed),
@@ -114,6 +146,7 @@ export class PostgresQuerySearchStore implements QuerySearchStore {
         request.mode,
         compactQuery,
         terms,
+        MIN_LEXICAL_TERM_COVERAGE,
         MAX_DATABASE_CANDIDATES,
       ],
     );
@@ -392,10 +425,8 @@ function lexicalScore(
   const frequencies = terms.map((term) =>
     occurrences(normalizedContent, normalizeSearch(term)),
   );
-  if (!phraseMatched && frequencies.some((frequency) => frequency === 0)) {
-    return undefined;
-  }
   const coverage = frequencies.filter((frequency) => frequency > 0).length / terms.length;
+  if (!phraseMatched && coverage < MIN_LEXICAL_TERM_COVERAGE) return undefined;
   const termFrequency =
     frequencies.reduce((total, frequency) => total + Math.log1p(frequency), 0) /
     terms.length;
@@ -413,11 +444,11 @@ function lexicalTerms(query: string, locale?: string): readonly string[] {
   try {
     const segmenter = new Intl.Segmenter(locale, { granularity: "word" });
     for (const segment of segmenter.segment(query)) {
-      if (segment.isWordLike === true) unique.add(normalizeSearch(segment.segment));
+      if (segment.isWordLike === true) addLexicalTerm(unique, segment.segment);
     }
   } catch {
     for (const term of query.split(/[\p{P}\p{S}\s]+/u)) {
-      if (term.length > 0) unique.add(normalizeSearch(term));
+      addLexicalTerm(unique, term);
     }
   }
   if (unique.size === 0) {
@@ -425,6 +456,14 @@ function lexicalTerms(query: string, locale?: string): readonly string[] {
     if (normalized.length > 0) unique.add(normalized);
   }
   return [...unique];
+}
+
+function addLexicalTerm(target: Set<string>, value: string): void {
+  const normalized = normalizeSearch(value);
+  if (!normalized) return;
+  if (/^\p{Script=Han}$/u.test(normalized)) return;
+  if (LEXICAL_STOP_TERMS.has(normalized)) return;
+  target.add(normalized);
 }
 
 function passagesAtByteOffsets(bytes: Buffer, start: number, end: number): string {

@@ -339,6 +339,60 @@ describe("passage query and context packs", () => {
     await app.close();
   });
 
+  it("retrieves a relevant passage from a natural question without requiring every question word", async () => {
+    const relevant = asset("1", "退款超过 30 天时，需要主管复核材料并记录原因。");
+    const unrelated = asset("2", "账号登录失败时，重置密码并检查多因素认证。");
+    const app = await buildApplication({
+      config: config(),
+      growth: growth([relevant, unrelated]),
+      logger: false,
+    });
+
+    const response = await app.inject({
+      headers: headers(),
+      method: "POST",
+      payload: query({
+        query: { locale: "zh-CN", text: "为什么退款超过 30 天后应该如何完成主管复核？" },
+      }),
+      url: "/akep/0.1/queries",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().results.map((item: { revisionId: string }) => item.revisionId)).toEqual([
+      relevant.revisionId,
+    ]);
+    await app.close();
+  });
+
+  it("ignores agent and politeness wrappers when computing Chinese lexical coverage", async () => {
+    const relevant = asset("1", "指标卡使用紧凑网格并减少空白。数据源渠道应放在折叠证据入口中。");
+    const unrelated = asset("2", "模型密钥应集中托管，并按项目绑定访问权限。");
+    const app = await buildApplication({
+      config: config(),
+      growth: growth([relevant, unrelated]),
+      logger: false,
+    });
+    const questions = [
+      "请直接处理以下请求：指标卡太松散、数据源渠道占满页面时应该如何优化？",
+      "这是独立验收样本，请保持原意处理：指标卡太松散、数据源渠道占满页面时应该如何优化？",
+      "指标卡太松散、数据源渠道占满页面时应该如何优化？请严格保留原文中的输出要求。",
+    ];
+
+    for (const text of questions) {
+      const response = await app.inject({
+        headers: headers(),
+        method: "POST",
+        payload: query({ query: { locale: "zh-CN", text } }),
+        url: "/akep/0.1/queries",
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().results.map((item: { revisionId: string }) => item.revisionId)).toContain(
+        relevant.revisionId,
+      );
+    }
+    await app.close();
+  });
+
   it("paginates with a snapshot-bound cursor and rejects cursor reuse", async () => {
     const assets = [
       asset("1", "退款超过 30 天时，需要主管复核。"),
@@ -580,6 +634,55 @@ describe("passage query and context packs", () => {
         .subarray(citation.locator.start, citation.locator.end)
         .toString("utf8"),
     ).toBe(citation.quote);
+    await app.close();
+  });
+
+  it("never crosses an explicitly requested shared plus project Space boundary", async () => {
+    const sharedSpace = "https://knowledge.test/spaces/quantpilot/shared";
+    const projectA = "https://knowledge.test/spaces/quantpilot/projects/project-a";
+    const projectB = "https://knowledge.test/spaces/quantpilot/projects/project-b";
+    const inSpace = (published: PublishedAsset, spaceId: string): PublishedAsset => ({
+      ...published,
+      publicationEvent: { ...published.publicationEvent, spaceId },
+      spaceId,
+    });
+    const assets = [
+      inSpace(asset("1", "量化看板必须披露数据新鲜度。"), sharedSpace),
+      inSpace(asset("2", "项目 A 的指标口径与风险阈值。"), projectA),
+      inSpace(asset("3", "项目 B 的私有策略与风险阈值。"), projectB),
+    ];
+    let selectedSpaces: readonly string[] | undefined;
+    const app = await buildApplication({
+      config: config(),
+      growth: growth(assets, new Set(), (spaceIds) => {
+        selectedSpaces = spaceIds;
+      }),
+      logger: false,
+    });
+    const response = await app.inject({
+      headers: headers(),
+      method: "POST",
+      payload: {
+        budget: { maxCharacters: 2_000, maxPassages: 10, maxTokens: 1_000 },
+        critical: [],
+        mode: "lexical",
+        purpose: "customer-support",
+        spaces: [sharedSpace, projectA],
+        supportedObligations: ["cite"],
+        task: { locale: "zh-CN", text: "量化看板项目指标风险阈值数据新鲜度" },
+      },
+      url: "/akep/0.1/context-packs",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(selectedSpaces).toEqual([projectA, sharedSpace]);
+    const returnedSpaces = [
+      ...response.json().passages.map((item: { spaceId: string }) => item.spaceId),
+      ...response.json().citations.map((item: { spaceId: string }) => item.spaceId),
+    ];
+    expect(returnedSpaces.length).toBeGreaterThan(0);
+    expect(new Set(returnedSpaces)).toEqual(new Set([projectA, sharedSpace]));
+    expect(returnedSpaces).not.toContain(projectB);
     await app.close();
   });
 });

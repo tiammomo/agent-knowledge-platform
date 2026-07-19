@@ -31,6 +31,7 @@ import {
   encodeCursor,
   InMemoryQuerySearchStore,
   knowledgeSnapshot,
+  LEXICAL_RANKER_FINGERPRINT,
   lexicalCoverage,
   queryFingerprint,
   rankAssetPassages,
@@ -914,7 +915,7 @@ function queryResult(
         method:
           request.mode === "exact" ? "exact-passage" : "lexical-passage",
         metric: "normalized-relevance",
-        profile: `${config.publicOrigin}/rankers/akep-lexical-v2`,
+        profile: `${config.publicOrigin}/rankers/${LEXICAL_RANKER_FINGERPRINT}`,
         value: result.score,
       },
     ],
