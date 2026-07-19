@@ -128,14 +128,14 @@ export function loadConfig(
     throw new Error("Development authentication is forbidden in production");
   }
 
-  const port = Number.parseInt(env.PORT ?? "3000", 10);
+  const port = Number.parseInt(env.PORT ?? "38085", 10);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     throw new Error("PORT must be an integer between 1 and 65535");
   }
 
   const publicOrigin = requireUri(
     "AKEP_PUBLIC_ORIGIN",
-    env.AKEP_PUBLIC_ORIGIN ?? "http://localhost:3000",
+    env.AKEP_PUBLIC_ORIGIN ?? "http://localhost:33005",
   );
   if (nodeEnv === "production" && new URL(publicOrigin).protocol !== "https:") {
     throw new Error("AKEP_PUBLIC_ORIGIN must use HTTPS in production");

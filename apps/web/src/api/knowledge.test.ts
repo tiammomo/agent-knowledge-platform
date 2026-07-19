@@ -34,4 +34,23 @@ describe("browser contribution builder", () => {
     expect(decoded).toBe("# 安全检查\n\n1. 先检查来源。");
     expect(body.inlinePayloads[0]!.digest).toMatch(/^sha256:[a-f0-9]{64}$/u);
   });
+
+  it("binds an explicitly selected consumer purpose into policy", async () => {
+    const built = await buildKnowledgeContribution({
+      allowedPurposes: ["quant-research"],
+      assetType: "procedure",
+      content: "# QuantPilot 验收\n\n只允许量化研究用途。",
+      evidenceRefs: [],
+      labels: ["quantpilot", "acceptance"],
+      primarySources: [],
+      rationale: "验证外部 Agent 可选择受治理用途。",
+      spaceId: "https://knowledge.local/spaces/quantpilot-acceptance",
+      summary: "QuantPilot 接入验收知识。",
+      title: "QuantPilot 验收",
+    });
+
+    expect(built.manifest).toMatchObject({
+      policy: { allowedPurposes: ["quant-research"] },
+    });
+  });
 });

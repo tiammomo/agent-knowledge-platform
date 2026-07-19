@@ -16,6 +16,8 @@
     "test:integration": "node scripts/run-integration.mjs",
     "start": "pnpm --filter @akep/core start",
     "smoke:web": "pnpm --filter @akep/web smoke",
+    "seed:quantpilot-acceptance": "pnpm --filter @akep/web seed:quantpilot-acceptance",
+    "seed:quantpilot-acceptance-50": "pnpm --filter @akep/web seed:quantpilot-acceptance-50",
     "sdk:check": "pnpm --filter @akep/sdk typecheck && pnpm --filter @akep/mcp-server typecheck && PYTHONPATH=packages/sdk-python python -m unittest discover -s packages/sdk-python/tests",
     "test": "pnpm --filter @akep/core test && pnpm --filter @akep/web test",
     "typecheck": "pnpm --filter @akep/sdk typecheck && pnpm --filter @akep/mcp-server typecheck && pnpm --filter @akep/core typecheck && pnpm --filter @akep/web typecheck",

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { getOverview, searchKnowledge } from "../src/api/client";
 import { importDemoKnowledge } from "../src/api/demo";
 
-const origin = process.env.AKEP_WEB_ORIGIN ?? "http://127.0.0.1:8080";
+const origin = process.env.AKEP_WEB_ORIGIN ?? "http://127.0.0.1:33005";
 const nativeFetch = globalThis.fetch;
 globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
   const target = typeof input === "string" ? new URL(input, origin) : input;

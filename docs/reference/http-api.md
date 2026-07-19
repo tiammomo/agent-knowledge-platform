@@ -12,8 +12,8 @@
 
 | 入口 | 本地默认地址 | 说明 |
 | --- | --- | --- |
-| Web 统一入口 | `http://localhost:8080` | SPA，并代理 discovery、AKEP、Console、health 和 schemas |
-| Core 直连 | `http://localhost:3000` | 本地协议调试 |
+| Web 统一入口 | `http://localhost:33005` | SPA，并代理 discovery、AKEP、Console、health 和 schemas |
+| Core 直连 | `http://localhost:38085` | 本地协议调试 |
 | Capability Discovery | `GET /.well-known/akep` | 无需预知版本，实例能力的首要入口 |
 | AKEP Base URL | `/akep/0.1` | Query、读取、贡献、评测与治理 API |
 | Console Read Model | `/console/v1` | 私有管理视图，不属于 AKEP Core 协议 |
@@ -21,8 +21,8 @@
 先检查实例是否就绪并读取能力：
 
 ```bash
-curl --fail http://localhost:3000/health/ready
-curl --fail http://localhost:3000/.well-known/akep
+curl --fail http://localhost:38085/health/ready
+curl --fail http://localhost:38085/.well-known/akep
 ```
 
 客户端不得仅凭仓库 OpenAPI 推断实例已启用某项能力；应读取 discovery 的 `profiles`、
@@ -59,7 +59,7 @@ OIDC 试点 token 还必须包含签名 Tenant claim，默认名称为 `akep_ten
 先完成 Web 首次引导以创建并发布一条示例知识；否则合法查询可能返回空结果。
 
 ```bash
-curl --fail-with-body http://localhost:3000/akep/0.1/queries \
+curl --fail-with-body http://localhost:38085/akep/0.1/queries \
   -H 'Authorization: Bearer dev-reader' \
   -H 'AKEP-Version: 0.1' \
   -H 'Content-Type: application/json' \

@@ -7,6 +7,8 @@
     "build": "tsc -b && vite build",
     "dev": "vite",
     "smoke": "tsx scripts/smoke.ts",
+    "seed:quantpilot-acceptance": "tsx scripts/seed-quantpilot-acceptance.ts",
+    "seed:quantpilot-acceptance-50": "tsx scripts/seed-quantpilot-acceptance-50.ts",
     "test": "vitest run",
     "typecheck": "tsc -b --pretty false"
   },

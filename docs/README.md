@@ -17,8 +17,11 @@
 | --- | --- | --- |
 | 了解项目解决什么问题 | [系统概览](architecture/system-overview.md) | 当前组件、数据边界、核心流程与有意关闭的能力 |
 | 在本地运行和调试 | [本地开发手册](runbooks/local-development.md) | 容器/宿主机启动、开发身份、验证与排障方法 |
+| 清理测试数据或制定长期保留策略 | [数据维护与测试隔离](runbooks/data-maintenance.md) | 不可变证据、临时测试库、备份和安全清理边界 |
 | 通过 HTTP 接入 | [HTTP API 快速参考](reference/http-api.md) | Base URL、请求头、权限、端点分组和可运行示例 |
 | 让外部系统安全接入 | [外部接入设计](architecture/external-integration.md)、[接入运行手册](runbooks/external-system-onboarding.md) | 接入模式、Integration/Connector、canary、轮换与停用 |
+| 让 QuantPilot 消费受治理知识 | [QuantPilot 接入设计](architecture/quantpilot-integration.md) | ContextPack、Citation/Usage、ModelPort/Qwen 分工和运行隔离 |
+| 组合用户记忆、共享知识与任务结果 | [Memory/Knowledge 组合边界](architecture/memory-knowledge-composition.md) | 对象所有权、联合 receipt、结果回流和禁止耦合 |
 | 通过 SDK 或 MCP 接入 | [TypeScript SDK](../packages/sdk-ts/README.md)、[Python SDK](../packages/sdk-python/README.md)、[MCP Adapter](../apps/mcp-server/README.md) | Agent 侧查询、读取、Usage/Feedback 与候选贡献 |
 | 建立持续知识运营 | [知识持续维护](governance/knowledge-maintenance.md) | Owner、来源水位、复审队列、SLA、冲突和退出 |
 | 设计团队隔离与共享 | [多团队隔离设计](architecture/multi-team-isolation.md) | Tenant/Space、RLS、检索/对象/缓存隔离和 Shared Space |
@@ -38,6 +41,8 @@ docs/
 │   ├── external-integration.md
 │   ├── implementation-status.md
 │   ├── multi-team-isolation.md
+│   ├── memory-knowledge-composition.md
+│   ├── quantpilot-integration.md
 │   ├── system-overview.md
 │   ├── technical-design-v0.1.md
 │   └── adr/
@@ -51,6 +56,7 @@ docs/
 ├── reference/
 │   └── http-api.md
 └── runbooks/
+    ├── data-maintenance.md
     ├── external-system-onboarding.md
     ├── local-development.md
     └── production-pilot.md

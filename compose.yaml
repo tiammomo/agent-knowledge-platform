@@ -28,9 +28,9 @@ services:
       AUTH_MODE: development
       DATABASE_URL: postgres://akep:akep-local-only@postgres:5432/akep
       DATABASE_REQUIRED: "true"
-      AKEP_PUBLIC_ORIGIN: http://localhost:${AKEP_WEB_PORT:-8080}
+      AKEP_PUBLIC_ORIGIN: http://localhost:${AKEP_WEB_PORT:-33005}
     ports:
-      - "${AKEP_HOST_PORT:-3000}:3000"
+      - "${AKEP_HOST_PORT:-38085}:3000"
     init: true
     read_only: true
     tmpfs:
@@ -58,7 +58,7 @@ services:
       context: .
       dockerfile: infra/docker/web.Dockerfile
     ports:
-      - "${AKEP_WEB_PORT:-8080}:8080"
+      - "${AKEP_WEB_PORT:-33005}:8080"
     init: true
     read_only: true
     tmpfs:

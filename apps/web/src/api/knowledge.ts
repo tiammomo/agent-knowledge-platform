@@ -13,6 +13,7 @@ const PROFILE = {
 } as const;
 
 export interface KnowledgeDraft {
+  readonly allowedPurposes?: readonly string[];
   readonly assetType: "procedure" | "source_document";
   readonly baseRevisionId?: string;
   readonly content: string;
@@ -52,7 +53,7 @@ export async function buildKnowledgeContribution(
     ],
     policy: {
       accessPolicyRefs: [],
-      allowedPurposes: ["customer-support"],
+      allowedPurposes: draft.allowedPurposes ?? ["customer-support"],
       classification: "internal",
       export: "deny",
       licenses: ["LicenseRef-Company-Internal"],
